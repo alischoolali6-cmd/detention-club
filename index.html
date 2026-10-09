@@ -166,8 +166,9 @@ button{ font-family:inherit; }
 .hero__art{ position:relative; aspect-ratio:1/1; min-width:0; }
 .floaty{ position:absolute; animation: bob 5s var(--ease-in-out) infinite; }
 @keyframes bob{ 0%,100%{ transform:translateY(0) rotate(var(--r,0deg)); } 50%{ transform:translateY(-16px) rotate(var(--r,0deg)); } }
-.shape{ position:absolute; border:var(--border-w) solid var(--color-ink); box-shadow:var(--shadow-sticker); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:800; }
+.shape{ overflow:hidden; position:absolute; border:var(--border-w) solid var(--color-ink); box-shadow:var(--shadow-sticker); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:800; }
 .shape--circle{ border-radius:50%; }
+.shape img{ width:100%; height:100%; object-fit:cover; display:block; }
 .shape--squish{ border-radius:45% 55% 60% 40%/55% 45% 55% 45%; }
 
 @media (max-width:60rem){
@@ -372,10 +373,10 @@ footer{ padding-block:var(--space-3xl) var(--space-2xl); border-top:var(--border
       </div>
     </div>
     <div class="hero__art" aria-hidden="true">
-      <div class="shape shape--squish floaty" style="--r:-6deg; width:38%; aspect-ratio:1; top:2%; left:6%; background:var(--color-lime);"></div>
-      <div class="shape shape--circle floaty" style="--r:4deg; width:30%; aspect-ratio:1; top:8%; right:4%; background:var(--color-yellow); animation-delay:.4s; font-size:1.6rem;">★</div>
-      <div class="shape shape--squish floaty" style="--r:8deg; width:44%; aspect-ratio:1; bottom:14%; left:14%; background:var(--color-pink); animation-delay:.8s;"></div>
-      <div class="shape shape--circle floaty" style="--r:-8deg; width:26%; aspect-ratio:1; bottom:2%; right:10%; background:var(--color-blue); animation-delay:1.2s; font-size:1.4rem; color:var(--color-paper);">⚡</div>
+      <div class="shape shape--squish floaty" style="--r:-6deg; width:38%; aspect-ratio:1; top:2%; left:6%; background:var(--color-lime);"><img src="images/3d-printed-gradient-items.jpeg" alt="" width="300" height="300"></div>
+      <div class="shape shape--circle floaty" style="--r:4deg; width:30%; aspect-ratio:1; top:8%; right:4%; background:var(--color-yellow); animation-delay:.4s; font-size:1.6rem;"><img src="images/banana-squishies.jpeg" alt="" width="300" height="300"></div>
+      <div class="shape shape--squish floaty" style="--r:8deg; width:44%; aspect-ratio:1; bottom:14%; left:14%; background:var(--color-pink); animation-delay:.8s;"><img src="images/watermelon-squishies.jpeg" alt="" width="300" height="300"></div>
+      <div class="shape shape--circle floaty" style="--r:-8deg; width:26%; aspect-ratio:1; bottom:2%; right:10%; background:var(--color-blue); animation-delay:1.2s; font-size:1.4rem; color:var(--color-paper);"><img src="images/fashionable-glasses.jpeg" alt="" width="300" height="300"></div>
     </div>
   </section>
 
