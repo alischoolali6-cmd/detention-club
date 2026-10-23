@@ -15,3 +15,7 @@ After that, every change Claude pushes goes live on the same link.
 In Supabase SQL Editor, run `supabase-migration-2.sql` once (after `supabase-setup.sql`). It is safe to run again.
 Then in the admin: Money tab (set the starting bank balance), Stock & prices (enter your cost per item), Restock tab.
 Optional: Database > Extensions > turn on `pg_cron`, then run the migration again to schedule the weekly cleanup.
+
+## Upgrade 3 (promo codes, delivery by block, pre-order controls, photo upload, write-offs)
+
+Run `supabase-upgrade-all.sql` (upgrade 2 + 3 in one file) once in the SQL Editor. Safe to run again.

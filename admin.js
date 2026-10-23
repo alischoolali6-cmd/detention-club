@@ -1,52 +1,48 @@
+/* Detention Club admin: login, orders, stock & products, reviews, visitors. (Money, restock, promo, delivery, cleanup live in admin-money.js and admin-more.js.) */
 (function () {
   "use strict";
   var cfg = window.DC_CONFIG || {};
+  var E = window.DCEmails;
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]; }); }
-  function money(f) { f = Number(f) || 0; return f >= 1000 ? (f / 1000).toFixed(3) + " BD" : f + " fils"; }
   function bd(f) { return (Number(f) / 1000).toFixed(3) + " BD"; }
+  function money(f) { f = Number(f) || 0; return f >= 1000 ? bd(f) : f + " fils"; }
   function fmt(d) { return new Date(d).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); }
   function dayKey(d) { return new Date(d).toLocaleDateString("en-CA", { timeZone: "Asia/Bahrain" }); }
   var toastT;
-  function toast(m) { var t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2200); }
+  function toast(m) { var t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2600); }
 
-  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
-    $("lErr").textContent = "The admin is not connected to Supabase yet (config.js is empty).";
-    return;
-  }
+  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) { $("lErr").textContent = "The admin is not connected to Supabase yet (config.js is empty)."; return; }
   var sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-  var A = window.DCAdmin = { sb: sb, $: $, esc: esc, bd: bd, fmt: fmt, dayKey: dayKey, toast: toast, hooks: [], extraLoad: null,
-    reload: function () { loadAll(); }, orders: function () { return orders; }, products: function () { return products; },
-    showTab: function (name) { var b = document.querySelector('#mainTabs [data-tab="' + name + '"]'); if (b) b.click(); } };
+
+  var orders = [], products = [], filter = "active", q = "", openIds = {}, confirmCancel = null;
+  var A = window.DCAdmin = {
+    sb: sb, $: $, esc: esc, bd: bd, fmt: fmt, dayKey: dayKey, toast: toast, hooks: [], loaders: [], data: { adjustments: [], promos: [], blocks: [] },
+    orders: function () { return orders; }, products: function () { return products; },
+    reload: function () { loadAll(); },
+    showTab: function (name) { var b = document.querySelector('#mainTabs [data-tab="' + name + '"]'); if (b) b.click(); },
+    extraLoad: function () { return Promise.all(A.loaders.map(function (f) { return f(); })).then(fire); }
+  };
   function fire() { A.hooks.forEach(function (f) { f(); }); }
 
-  var STATUS = { received: "New", preparing: "Preparing", ready: "Ready for delivery", out_for_delivery: "Out for delivery", delivered: "Delivered", cancelled: "Cancelled" };
-  var NEXT = { received: ["preparing", "Approve order"], preparing: ["ready", "Mark ready for delivery"], ready: ["out_for_delivery", "Out for delivery"], out_for_delivery: ["delivered", "Mark delivered"] };
+  var STATUS = { received: "New", preparing: "Confirmed", ready: "Confirmed for delivery", out_for_delivery: "Out for delivery", delivered: "Delivered", cancelled: "Cancelled" };
+  var NEXT = { received: ["preparing", "Confirm order"], preparing: ["ready", "Confirm for delivery"], ready: ["out_for_delivery", "Mark out for delivery"], out_for_delivery: ["delivered", "Mark delivered"] };
   var CATS = { fidget: "Fidget & Stretch", squish: "Squish Zone", style: "Style & Accessories", useful: "Cool & Useful", creative: "Creative & Novelty", special: "Special Finds" };
-  var FILTERS = [["active", "Active"], ["received", "New"], ["pre", "Pre-orders"], ["preparing", "Preparing"], ["ready", "Ready"], ["out_for_delivery", "Out for delivery"], ["delivered", "Delivered"], ["cancelled", "Cancelled"], ["all", "All"]];
-  var products = [], orders = [], filter = "active", q = "", openIds = {}, confirmCancel = null, timer = null;
+  A.CATS = CATS;
+  var FILTERS = [["active", "Active"], ["received", "New"], ["pre", "Pre-orders"], ["preparing", "Confirmed"], ["ready", "For delivery"], ["out_for_delivery", "Out for delivery"], ["delivered", "Delivered"], ["cancelled", "Cancelled"], ["all", "All"]];
+  var TABS = ["orders", "money", "restock", "stock", "promos", "zones", "reviews", "visitors", "data"];
 
   /* ---------- login ---------- */
   sb.auth.getSession().then(function (r) { if (r.data.session) enter(); });
   $("loginForm").addEventListener("submit", function (e) {
     e.preventDefault(); $("lErr").textContent = "";
-    sb.auth.signInWithPassword({ email: (function(u){ return u.indexOf("@") > -1 ? u : u.toLowerCase() + "@detentionclub.app"; })($("lEmail").value.trim()), password: $("lPass").value }).then(function (r) {
-      if (r.error) { $("lErr").textContent = "Wrong email or password."; return; }
+    var u = $("lEmail").value.trim();
+    sb.auth.signInWithPassword({ email: u.indexOf("@") > -1 ? u : u.toLowerCase() + "@detentionclub.app", password: $("lPass").value }).then(function (r) {
+      if (r.error) { $("lErr").textContent = "Wrong username or password."; return; }
       enter();
     });
   });
   $("logoutBtn").addEventListener("click", function () { sb.auth.signOut().then(function () { location.reload(); }); });
-  $("previewBtn").addEventListener("click", function () {
-    var o = sampleOrder();
-    $("previewBox").hidden = !$("previewBox").hidden;
-    $("previewConfirm").textContent = "Subject: " + emailSubject(o, "confirm") + "\n\n" + emailText(o, "confirm");
-    $("previewDelivery").textContent = "Subject: " + emailSubject(o, "delivery") + "\n\n" + emailText(o, "delivery");
-    var s = sampleOrder(); s.has_preorder = false; s.order_items[1].preorder_qty = 0; s.order_items[1].qty = 1;
-    $("previewConfirm").textContent = "Subject: " + emailSubject(s, "confirm") + "\n\n" + emailText(s, "confirm");
-    $("previewPre").textContent = "Subject: " + emailSubject(o, "preorder") + "\n\n" + emailText(o, "preorder");
-  });
-  $("promptBtn").addEventListener("click", function () { $("promptText").value = buildPrompt(); $("promptBox").hidden = false; });
-  $("promptCopy").addEventListener("click", function () { (navigator.clipboard ? navigator.clipboard.writeText($("promptText").value) : Promise.reject()).then(function () { toast("Prompt copied"); }, function () { $("promptText").select(); toast("Press Cmd+C to copy"); }); });
   $("refreshBtn").addEventListener("click", function () { loadAll(true); });
 
   function enter() {
@@ -54,19 +50,30 @@
     $("npCat").innerHTML = Object.keys(CATS).map(function (k) { return '<option value="' + k + '">' + CATS[k] + '</option>'; }).join("");
     $("orderFilters").innerHTML = FILTERS.map(function (f) { return '<button class="tab" data-f="' + f[0] + '" aria-pressed="' + (f[0] === filter) + '">' + f[1] + '</button>'; }).join("");
     loadAll();
-    timer = setInterval(function () { if (!$("tab-orders").hidden) loadOrders(); }, 30000);
+    setInterval(function () { if (!$("tab-orders").hidden) loadOrders(); }, 30000);
   }
-
   $("mainTabs").addEventListener("click", function (e) {
     var b = e.target.closest("[data-tab]"); if (!b) return;
     document.querySelectorAll("#mainTabs .tab").forEach(function (t) { t.setAttribute("aria-pressed", t === b ? "true" : "false"); });
-    ["orders", "money", "restock", "stock", "zones", "reviews", "visitors", "data"].forEach(function (t) { $("tab-" + t).hidden = t !== b.dataset.tab; });
+    TABS.forEach(function (t) { $("tab-" + t).hidden = t !== b.dataset.tab; });
     if (b.dataset.tab === "visitors") loadViews();
   });
-
   function loadAll(announce) {
-    Promise.all([loadOrders(), loadStock(), loadZones(), loadReviews(), A.extraLoad ? A.extraLoad() : null]).then(function () { if (announce) toast("Updated"); });
+    Promise.all([loadOrders(), loadStock(), loadReviews(), A.extraLoad()]).then(function () { if (announce) toast("Updated"); });
   }
+
+  /* ---------- prompts + email preview ---------- */
+  function showPrompt(t) { $("promptText").value = t; $("promptBox").hidden = false; $("promptBox").scrollIntoView({ block: "nearest" }); }
+  $("p1Btn").addEventListener("click", function () { showPrompt(E.prompt1(orders)); });
+  $("p2Btn").addEventListener("click", function () { showPrompt(E.prompt2(orders)); });
+  $("promptCopy").addEventListener("click", function () { (navigator.clipboard ? navigator.clipboard.writeText($("promptText").value) : Promise.reject()).then(function () { toast("Prompt copied"); }, function () { $("promptText").select(); toast("Press Cmd+C to copy"); }); });
+  $("previewBtn").addEventListener("click", function () {
+    $("previewBox").hidden = !$("previewBox").hidden;
+    var s = E.sampleOrder(), p = E.samplePre();
+    $("previewConfirm").textContent = "Subject: " + E.subject(s, "confirm") + "\n\n" + E.text(s, "confirm");
+    $("previewPre").textContent = "Subject: " + E.subject(p, "preorder") + "\n\n" + E.text(p, "preorder");
+    $("previewDelivery").textContent = "Subject: " + E.subject(s, "delivery") + "\n\n" + E.text(s, "delivery");
+  });
 
   /* ---------- orders ---------- */
   function loadOrders() {
@@ -80,14 +87,11 @@
     var today = dayKey(new Date()), live = orders.filter(function (o) { return o.status !== "cancelled"; });
     var tOrders = live.filter(function (o) { return dayKey(o.created_at) === today; });
     var sum = function (a) { return a.reduce(function (s, o) { return s + o.total_fils; }, 0); };
-    var newN = orders.filter(function (o) { return o.status === "received"; }).length;
+    var count = function (st) { return orders.filter(function (o) { return o.status === st; }).length; };
     var preN = orders.filter(function (o) { return o.has_preorder && isOpen(o); }).length;
-    var cells = [
-      [tOrders.length, "Orders today"], [bd(sum(tOrders)), "Money today"], [newN, "New orders"], [preN, "Open pre-orders"],
-      [live.length, "All orders"], [bd(sum(live)), "All money"], [bd(sum(live.filter(function (o) { return o.status === "delivered"; }))), "Delivered money"]
-    ];
+    var cells = [[tOrders.length, "Orders today"], [bd(sum(tOrders)), "Order value today"], [count("received"), "New (to confirm)"], [count("preparing"), "Confirmed (email due)"], [count("ready"), "Confirmed for delivery"], [preN, "Open orders with abroad items"], [live.length, "All orders"], [bd(sum(live)), "All order value"]];
     $("stats").innerHTML = cells.map(function (c) { return '<div class="stat"><b>' + esc(c[0]) + '</b><span>' + c[1] + '</span></div>'; }).join("");
-    $("newBadge").textContent = newN ? "(" + newN + " new)" : "";
+    $("newBadge").textContent = count("received") ? "(" + count("received") + " new)" : "";
   }
   function matchFilter(o) {
     if (filter === "all") return true;
@@ -95,98 +99,31 @@
     if (filter === "pre") return o.has_preorder && isOpen(o);
     return o.status === filter;
   }
-  function itemsText(o) { return (o.order_items || []).map(function (i) { return i.qty + " x " + i.name + (i.preorder_qty ? " (" + i.preorder_qty + " pre-order)" : ""); }).join(", "); }
   function digits(p) { var d = String(p).replace(/[^0-9]/g, ""); return d.length === 8 ? "973" + d : d; }
-  function trackLink(o) { return location.origin + location.pathname.replace(/\/admin(\.html)?\/?$/, "").replace(/\/$/, "") + "/track.html?code=" + o.code; }
-  function itemLines(o) {
-    return (o.order_items || []).map(function (i) {
-      return "  - " + i.qty + " x " + i.name + " (" + bd(i.unit_price_fils * i.qty) + ")" + (i.preorder_qty ? " - " + i.preorder_qty + " pre-order, arrives in 8-10 days" : "");
-    }).join("\n");
-  }
-  function stockPart(o) { return (o.order_items || []).filter(function (i) { return i.qty - i.preorder_qty > 0; }).map(function (i) { return "  - " + (i.qty - i.preorder_qty) + " x " + i.name; }).join("\n"); }
-  function prePart(o) { return (o.order_items || []).filter(function (i) { return i.preorder_qty > 0; }).map(function (i) { return "  - " + i.preorder_qty + " x " + i.name; }).join("\n"); }
-  function emailSubject(o, kind) {
-    if (kind === "preorder") return "Thank you for ordering from Detention Club: your pre-order (order " + o.code + ")";
-    return kind === "confirm" ? "Thank you for ordering from Detention Club (order " + o.code + ")" : "Your Detention Club order " + o.code + " arrives today";
-  }
-  function emailText(o, kind) {
-    var first = o.customer_name.split(" ")[0], link = trackLink(o);
-    var summary = "Order code: " + o.code + "\n" + itemLines(o) + "\n" +
-      "  Items: " + bd(o.subtotal_fils) + "\n  Delivery: " + (o.delivery_fee_fils ? bd(o.delivery_fee_fils) : "to be confirmed by phone") + "\n  Total to pay in cash on delivery: " + bd(o.total_fils);
-    var addr = "Delivery address: " + (o.area ? o.area + ", " : "") + o.address;
-    var tail = "\n\nFor inquiries and birthday parties, please contact detentionclub0@gmail.com.\n\nKind regards,\nDetention Club";
-    if (kind === "confirm") {
-      return "Dear " + first + ",\n\nThank you for ordering from Detention Club! We have received and approved your order.\n\n" + summary +
-        "\n\n" + addr + "\n\nWe usually deliver orders the next day or the day after. We will email you again on delivery day.\n" +
-        "\nYou pay in cash when your order arrives. Please keep your phone nearby so our driver can reach you.\n\nYou can follow your order at any time on our website with your order code:\n" + link + tail;
-    }
-    if (kind === "preorder") {
-      return "Dear " + first + ",\n\nThank you for ordering from Detention Club! We have received and approved your order.\n\n" +
-        "Some items in your order are pre-order items. We order these from our supplier for you, and they usually take 8-10 days to arrive.\n\n" + summary +
-        (stockPart(o) ? "\n\nItems we have ready now:\n" + stockPart(o) : "") + "\n\nPre-order items (arriving in about 8-10 days):\n" + prePart(o) +
-        "\n\nWhat happens next:\n  - " + (stockPart(o) ? "The items we have ready are prepared first. We will email you on delivery day.\n  - " : "") +
-        "Your pre-order items are on their way to us. We will email you as soon as they are ready to be delivered to you.\n\n" + addr +
-        "\n\nYou pay in cash when your order arrives. Please keep your phone nearby so our driver can reach you.\n\nYou can follow your order at any time on our website with your order code:\n" + link + tail;
-    }
-    return "Dear " + first + ",\n\nGood news! Your Detention Club order " + o.code + " will arrive through the day today.\n\n" + summary +
-      "\n\n" + addr + "\n\nPlease keep your phone nearby and have " + bd(o.total_fils) + " in cash ready for the driver.\n" +
-      "\nTrack your order here:\n" + link +
-      "\n\nOnce you have received your order, we would love a review. You can leave one on our website here:\n" + link + tail;
-  }
-  function firstKind(o) { return o.has_preorder ? "preorder" : "confirm"; }
-  function mailLink(o, kind) {
-    return "mailto:" + encodeURIComponent(o.email) + "?subject=" + encodeURIComponent(emailSubject(o, kind)) + "&body=" + encodeURIComponent(emailText(o, kind));
-  }
-  function buildPrompt() {
-    var conf = orders.filter(function (o) { return o.status === "preparing" && !o.confirm_emailed_at; });
-    var rdy = orders.filter(function (o) { return o.status === "ready" || o.status === "out_for_delivery"; });
-    var del = rdy.filter(function (o) { return !o.delivery_emailed_at; });
-    if (!conf.length && !rdy.length) return "There is nothing to do right now: no approved orders waiting for a confirmation email and no orders ready for delivery.";
-    var t = "You are helping me run Detention Club, a student-run toy store in Bahrain. Do the tasks below in order. Never enter payment details anywhere. Never send an email without showing me the draft and waiting for me to say 'send'.\n\n";
-    if (conf.length) {
-      t += "TASK 1 - CONFIRMATION EMAILS (from detentionclub0@gmail.com)\nThese orders are approved. Email each customer the confirmation below.\n\n";
-      conf.forEach(function (o, n) { t += "-- Confirmation " + (n + 1) + " of " + conf.length + " (order " + o.code + ") --\nTo: " + o.email + "\nSubject: " + emailSubject(o, firstKind(o)) + "\nBody:\n" + emailText(o, firstKind(o)) + "\n\n"; });
-    }
-    if (rdy.length) {
-      t += "TASK 2 - PARCEL APP (on this laptop)\nFor each order marked READY below, open the Parcel app and create a delivery. Enter ONLY the items price, the customer phone number and the customer location. For every order STOP before the final step that orders the driver, tell me what you filled in, and wait for me to say 'approved'.\n\n";
-      rdy.forEach(function (o, n) {
-        t += "-- Delivery " + (n + 1) + " of " + rdy.length + " (" + (o.status === "ready" ? "READY: book a driver" : "already out for delivery: no booking needed") + ") --\nCode: " + o.code + "\nCustomer: " + o.customer_name + "\nPhone: " + o.phone +
-          "\nLocation: " + (o.area ? o.area + ", " : "") + o.address + (o.notes ? "\nNotes: " + o.notes : "") + "\nItems: " + itemsText(o) + "\nItems price (enter in Parcel): " + bd(o.subtotal_fils) + "\nCash to collect: " + bd(o.total_fils) + "\n\n";
-      });
-    }
-    if (del.length) {
-      t += "TASK 3 - DELIVERY DAY EMAILS (from detentionclub0@gmail.com)\nAfter I approve each driver booking, email that customer the delivery day email below.\n\n";
-      del.forEach(function (o, n) { t += "-- Delivery email " + (n + 1) + " of " + del.length + " (order " + o.code + ") --\nTo: " + o.email + "\nSubject: " + emailSubject(o, "delivery") + "\nBody:\n" + emailText(o, "delivery") + "\n\n"; });
-    }
-    return t + "When everything is done, give me a short summary listing the order codes: which confirmation emails were sent, which drivers are booked, and which delivery emails were sent.";
-  }
-  function sampleOrder() {
-    return { code: "DC-A1B2C3", customer_name: "Sara Ahmed", email: "sara@example.com", area: "Riffa", address: "Building 12, Road 34, Block 929", subtotal_fils: 2900, delivery_fee_fils: 1000, total_fils: 3900, has_preorder: true,
-      order_items: [{ name: "Small Keychains", qty: 2, preorder_qty: 0, unit_price_fils: 200 }, { name: "Payment Star", qty: 1, preorder_qty: 1, unit_price_fils: 2000 }, { name: "Mini Colorful Rings", qty: 1, preorder_qty: 0, unit_price_fils: 300 }, { name: "Banana Squishies", qty: 1, preorder_qty: 0, unit_price_fils: 700 }] };
-  }
   function renderOrders() {
     renderStats();
     var s = q.trim().toLowerCase();
-    var list = orders.filter(matchFilter).filter(function (o) {
-      return !s || o.code.toLowerCase().indexOf(s) > -1 || o.customer_name.toLowerCase().indexOf(s) > -1 || o.phone.indexOf(s) > -1;
-    });
+    var list = orders.filter(matchFilter).filter(function (o) { return !s || o.code.toLowerCase().indexOf(s) > -1 || o.customer_name.toLowerCase().indexOf(s) > -1 || o.phone.indexOf(s) > -1; });
     if (!list.length) { $("orderList").innerHTML = '<p class="muted">No orders here yet.</p>'; return; }
     $("orderList").innerHTML = list.map(function (o) {
       var next = NEXT[o.status];
-      var items = (o.order_items || []).map(function (i) { return '<li><span>' + i.qty + ' × ' + esc(i.name) + (i.preorder_qty ? ' <span class="pre-tag">' + i.preorder_qty + ' pre-order</span>' : '') + '</span><span>' + money(i.unit_price_fils * i.qty) + '</span></li>'; }).join("");
+      var items = (o.order_items || []).map(function (i) { return '<li><span>' + i.qty + ' × ' + esc(i.name) + (i.preorder_qty ? ' <span class="pre-tag">' + i.preorder_qty + ' from abroad</span>' : '') + '</span><span>' + money(i.unit_price_fils * i.qty) + '</span></li>'; }).join("");
+      var firstBtn = o.has_preorder ? ["preorder", "Email 2: Pre-order"] : ["confirm", "Email 1: Confirmation"];
       return '<details class="order" data-id="' + o.id + '"' + (openIds[o.id] ? " open" : "") + '>' +
-        '<summary><span><span class="code">' + esc(o.code) + '</span> <span class="status ' + o.status + '">' + STATUS[o.status] + '</span>' + (o.has_preorder ? ' <span class="pre-tag">Pre-order</span>' : '') + '</span>' +
+        '<summary><span><span class="code">' + esc(o.code) + '</span> <span class="status ' + o.status + '">' + STATUS[o.status] + '</span>' + (o.has_preorder ? ' <span class="pre-tag">Abroad items</span>' : '') + (o.promo_code ? ' <span class="pre-tag" style="background:var(--color-pink)">' + esc(o.promo_code) + '</span>' : '') + '</span>' +
         '<span class="amt">' + bd(o.total_fils) + '</span><span class="sub">' + esc(o.customer_name) + ' · ' + fmt(o.created_at) + '</span></summary>' +
         '<div class="order__body"><div class="order__cols">' +
         '<div><h4>Customer</h4><p><b>' + esc(o.customer_name) + '</b></p><p><a href="tel:' + esc(o.phone) + '">' + esc(o.phone) + '</a> · <a href="https://wa.me/' + digits(o.phone) + '" target="_blank" rel="noopener">WhatsApp</a></p><p>' + esc(o.email) + '</p>' +
-        '<h4 style="margin-top:8px">Delivery address</h4><p>' + (o.area ? esc(o.area) + '<br>' : '') + esc(o.address) + '</p>' + (o.notes ? '<h4 style="margin-top:8px">Notes</h4><p>' + esc(o.notes) + '</p>' : '') + '</div>' +
+        '<h4 style="margin-top:8px">Delivery address</h4><p>' + esc(E.address(o)) + '</p>' + (o.notes ? '<h4 style="margin-top:8px">Notes</h4><p>' + esc(o.notes) + '</p>' : '') + '</div>' +
         '<div><h4>Items</h4><ul class="items-list">' + items + '</ul>' +
-        '<div class="total-row"><span>Items price</span><span>' + bd(o.subtotal_fils) + '</span></div><div class="total-row"><span>Delivery fee</span><span>' + bd(o.delivery_fee_fils) + '</span></div><div class="total-row big"><span>Collect (cash)</span><span>' + bd(o.total_fils) + '</span></div></div></div>' +
+        '<div class="total-row"><span>Items price</span><span>' + bd(o.subtotal_fils) + '</span></div>' +
+        (o.discount_fils ? '<div class="total-row"><span>Discount' + (o.promo_code ? ' (' + esc(o.promo_code) + ')' : '') + '</span><span>−' + bd(o.discount_fils) + '</span></div>' : '') +
+        '<div class="total-row"><span>Delivery fee' + (o.delivery_block ? ' (block ' + o.delivery_block + ')' : '') + '</span><span>' + bd(o.delivery_fee_fils) + '</span></div><div class="total-row big"><span>Collect (cash)</span><span>' + bd(o.total_fils) + '</span></div></div></div>' +
         '<div class="actions">' +
         (next ? '<button class="btn btn--lime btn--sm" data-set="' + next[0] + '" data-id="' + o.id + '">' + next[1] + '</button>' : '') +
         '<button class="btn btn--ghost btn--sm" data-parcel="' + o.id + '">Copy for Parcel</button>' +
-        (o.has_preorder ? '<a class="btn btn--ghost btn--sm" href="' + mailLink(o, "preorder") + '">Email 3: Pre-order' + (o.confirm_emailed_at ? " ✓" : "") + '</a>' : '<a class="btn btn--ghost btn--sm" href="' + mailLink(o, "confirm") + '">Email 1: Confirmation' + (o.confirm_emailed_at ? " ✓" : "") + '</a>') +
-        '<a class="btn btn--ghost btn--sm" href="' + mailLink(o, "delivery") + '">Email 2: Delivery day' + (o.delivery_emailed_at ? " ✓" : "") + '</a>' +
+        '<a class="btn btn--ghost btn--sm" href="' + E.mailLink(o, firstBtn[0]) + '">' + firstBtn[1] + (o.confirm_emailed_at ? " ✓" : "") + '</a>' +
+        '<a class="btn btn--ghost btn--sm" href="' + E.mailLink(o, "delivery") + '">Email 3: Delivery day' + (o.delivery_emailed_at ? " ✓" : "") + '</a>' +
         '<button class="btn btn--ghost btn--sm" data-sent="confirm_emailed_at" data-id="' + o.id + '">' + (o.confirm_emailed_at ? "Unmark confirmation sent" : "Mark confirmation sent") + '</button>' +
         '<button class="btn btn--ghost btn--sm" data-sent="delivery_emailed_at" data-id="' + o.id + '">' + (o.delivery_emailed_at ? "Unmark delivery email sent" : "Mark delivery email sent") + '</button>' +
         (isOpen(o) ? '<button class="btn btn--danger btn--sm" data-cancel="' + o.id + '">' + (confirmCancel === o.id ? "Tap again to cancel" : "Cancel order") + '</button>' : '') +
@@ -202,14 +139,24 @@
   $("orderList").addEventListener("toggle", function (e) { var d = e.target; if (d.dataset && d.dataset.id) openIds[d.dataset.id] = d.open; }, true);
   $("orderList").addEventListener("click", function (e) {
     var dcs = e.target.closest("[data-dcsave]");
-    if (dcs) { var inp = document.querySelector('[data-dcost="' + dcs.dataset.dcsave + '"]'); var val = parseInt(inp.value, 10); if (isNaN(val) || val < 0) { toast("Enter the Parcel price in fils"); return; } sb.rpc("set_delivery_cost", { p_order: dcs.dataset.dcsave, p_fils: val }).then(function (r) { if (r.error) { toast("Run the upgrade SQL first: " + r.error.message); return; } toast("Delivery cost saved"); loadOrders(); if (A.extraLoad) A.extraLoad(); }); return; }
+    if (dcs) {
+      var inp = document.querySelector('[data-dcost="' + dcs.dataset.dcsave + '"]'), val = parseInt(inp.value, 10);
+      if (isNaN(val) || val < 0) { toast("Enter the Parcel price in fils"); return; }
+      sb.rpc("set_delivery_cost", { p_order: dcs.dataset.dcsave, p_fils: val }).then(function (r) { if (r.error) { toast("Run the upgrade SQL first: " + r.error.message); return; } toast("Delivery cost saved"); loadAll(); });
+      return;
+    }
     var sent = e.target.closest("[data-sent]");
-    if (sent) { var oo = orders.filter(function (x) { return x.id === sent.dataset.id; })[0], patch = {}; patch[sent.dataset.sent] = oo[sent.dataset.sent] ? null : new Date().toISOString(); sb.from("orders").update(patch).eq("id", sent.dataset.id).then(function (r) { if (r.error) { toast("Run the new SQL first (email tracking)"); return; } loadOrders(); }); return; }
+    if (sent) {
+      var oo = orders.filter(function (x) { return x.id === sent.dataset.id; })[0], patch = {};
+      patch[sent.dataset.sent] = oo[sent.dataset.sent] ? null : new Date().toISOString();
+      sb.from("orders").update(patch).eq("id", sent.dataset.id).then(function (r) { if (r.error) { toast("Run the upgrade SQL first (email tracking)"); return; } loadOrders(); });
+      return;
+    }
     var set = e.target.closest("[data-set]"), par = e.target.closest("[data-parcel]"), can = e.target.closest("[data-cancel]");
     if (set) { setStatus(set.dataset.id, set.dataset.set); }
     else if (par) {
       var o = orders.filter(function (x) { return x.id === par.dataset.parcel; })[0];
-      var txt = "Items price: " + bd(o.subtotal_fils) + "\nCollect (cash): " + bd(o.total_fils) + "\nPhone: " + o.phone + "\nLocation: " + (o.area ? o.area + ", " : "") + o.address + "\nOrder: " + o.code;
+      var txt = "Items price: " + bd(o.subtotal_fils - o.discount_fils) + "\nCollect (cash): " + bd(o.total_fils) + "\nPhone: " + o.phone + "\nLocation: " + E.address(o) + "\nOrder: " + o.code;
       (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { toast("Copied for Parcel"); }, function () { toast("Copy failed"); });
     } else if (can) {
       if (confirmCancel === can.dataset.cancel) { confirmCancel = null; setStatus(can.dataset.cancel, "cancelled"); }
@@ -219,19 +166,44 @@
   function setStatus(id, st) {
     sb.rpc("update_order_status", { p_order: id, p_status: st }).then(function (r) {
       if (r.error) { toast("Error: " + r.error.message); return; }
-      toast("Status: " + STATUS[st]); loadOrders(); loadStock();
+      toast("Status: " + STATUS[st]); loadAll();
     });
   }
 
-  /* ---------- stock ---------- */
+  /* ---------- products & stock ---------- */
+  function resizeToBlob(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var max = 900, s = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement("canvas");
+        c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        c.toBlob(function (b) { b ? resolve(b) : reject(new Error("Could not read that image.")); }, "image/jpeg", 0.85);
+      };
+      img.onerror = function () { reject(new Error("That file is not an image.")); };
+      img.src = url;
+    });
+  }
+  function uploadPhoto(file) {
+    return resizeToBlob(file).then(function (blob) {
+      var path = "p-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".jpg";
+      return sb.storage.from("product-images").upload(path, blob, { contentType: "image/jpeg", upsert: false }).then(function (r) {
+        if (r.error) throw new Error("Photo upload is not set up yet. Run the upgrade 3 SQL. (" + r.error.message + ")");
+        return sb.storage.from("product-images").getPublicUrl(path).data.publicUrl;
+      });
+    });
+  }
   function loadStock() {
     return sb.from("products").select("*").order("sort").order("id").then(function (r) {
-      products = r.data || [];
-      fire();
-      $("stockTable").innerHTML = '<tr><th>Name</th><th>Category</th><th>Sell price (fils)</th><th>Your cost (fils)</th><th>Stock</th><th>Low at</th><th>Show</th><th></th></tr>' + products.map(function (p) {
-        return '<tr data-id="' + p.id + '"><td><input type="text" data-k="name" value="' + esc(p.name) + '"></td>' +
+      products = r.data || []; fire();
+      $("stockTable").innerHTML = '<tr><th>Photo</th><th>Name</th><th>Category</th><th>Sell price (fils)</th><th>Your cost (fils)</th><th>Stock</th><th>Low at</th><th>Pre-order OK</th><th>Show</th><th></th></tr>' + products.map(function (p) {
+        return '<tr data-id="' + p.id + '"><td>' + (p.image ? '<img src="' + esc(p.image) + '" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:2px solid var(--color-ink);display:block;margin-bottom:4px">' : '<span class="muted">none</span><br>') +
+          '<label class="link-btn" style="cursor:pointer">Change<input type="file" accept="image/*" hidden data-photo="' + p.id + '"></label></td>' +
+          '<td><input type="text" data-k="name" value="' + esc(p.name) + '"></td>' +
           '<td><select data-k="category">' + Object.keys(CATS).map(function (k) { return '<option value="' + k + '"' + (k === p.category ? " selected" : "") + '>' + CATS[k] + '</option>'; }).join("") + '</select></td>' +
-          '<td><input type="number" min="0" data-k="price_fils" value="' + p.price_fils + '"></td><td><input type="number" min="0" data-k="cost_fils" value="' + (p.cost_fils || 0) + '"></td><td><input type="number" min="0" data-k="stock" value="' + p.stock + '"></td><td><input type="number" min="0" data-k="reorder_level" value="' + (p.reorder_level == null ? 5 : p.reorder_level) + '"></td>' +
+          '<td><input type="number" min="0" data-k="price_fils" value="' + p.price_fils + '"></td><td><input type="number" min="0" data-k="cost_fils" value="' + (p.cost_fils || 0) + '"></td>' +
+          '<td><input type="number" min="0" data-k="stock" value="' + p.stock + '"></td><td><input type="number" min="0" data-k="reorder_level" value="' + (p.reorder_level == null ? 5 : p.reorder_level) + '"></td>' +
+          '<td><input type="checkbox" data-k="allow_preorder"' + (p.allow_preorder === false ? "" : " checked") + '></td>' +
           '<td><input type="checkbox" data-k="active"' + (p.active ? " checked" : "") + '></td><td><button class="btn btn--sm" data-save="' + p.id + '">Save</button></td></tr>';
       }).join("");
     });
@@ -240,37 +212,24 @@
     var b = e.target.closest("[data-save]"); if (!b) return;
     var tr = b.closest("tr"), v = {};
     tr.querySelectorAll("[data-k]").forEach(function (el) { var k = el.dataset.k; v[k] = el.type === "checkbox" ? el.checked : el.type === "number" ? Math.max(0, parseInt(el.value || "0", 10)) : el.value.trim(); });
-    sb.from("products").update(v).eq("id", Number(b.dataset.save)).then(function (r) { toast(r.error ? "Error: " + r.error.message : "Saved"); });
+    sb.from("products").update(v).eq("id", Number(b.dataset.save)).then(function (r) { toast(r.error ? "Error: " + r.error.message + (/allow_preorder|cost_fils|reorder_level/.test(r.error.message) ? " (run the upgrade SQL)" : "") : "Saved"); loadStock(); });
+  });
+  $("stockTable").addEventListener("change", function (e) {
+    var f = e.target.closest("[data-photo]"); if (!f || !f.files[0]) return;
+    toast("Uploading photo…");
+    uploadPhoto(f.files[0]).then(function (url) { return sb.from("products").update({ image: url }).eq("id", Number(f.dataset.photo)); })
+      .then(function (r) { if (r && r.error) throw r.error; toast("Photo saved"); loadStock(); }, function (err) { toast(err.message); });
   });
   $("addProduct").addEventListener("submit", function (e) {
     e.preventDefault();
-    sb.from("products").insert({ name: $("npName").value.trim(), category: $("npCat").value, price_fils: parseInt($("npPrice").value, 10), stock: parseInt($("npStock").value, 10), description: $("npDesc").value.trim(), image: $("npImg").value.trim() || null, sort: 100 })
-      .then(function (r) { if (r.error) { toast("Error: " + r.error.message); return; } toast("Product added"); $("addProduct").reset(); loadStock(); });
-  });
-
-  /* ---------- zones ---------- */
-  function loadZones() {
-    return sb.from("delivery_zones").select("*").order("name").then(function (r) {
-      var z = r.data || [];
-      $("zoneTable").innerHTML = '<tr><th>Area</th><th>Fee (fils)</th><th>Show</th><th></th></tr>' + (z.length ? z.map(function (x) {
-        return '<tr data-id="' + x.id + '"><td><input type="text" data-k="name" value="' + esc(x.name) + '"></td><td><input type="number" min="0" data-k="fee_fils" value="' + x.fee_fils + '"></td>' +
-          '<td><input type="checkbox" data-k="active"' + (x.active ? " checked" : "") + '></td><td><button class="btn btn--sm" data-save="' + x.id + '">Save</button> <button class="btn btn--danger btn--sm" data-del="' + x.id + '">Delete</button></td></tr>';
-      }).join("") : '<tr><td colspan="4" class="muted">No areas yet. Until you add some, customers type their area and you confirm the fee by phone.</td></tr>');
-    });
-  }
-  $("zoneTable").addEventListener("click", function (e) {
-    var s = e.target.closest("[data-save]"), d = e.target.closest("[data-del]");
-    if (s) {
-      var v = {}; s.closest("tr").querySelectorAll("[data-k]").forEach(function (el) { var k = el.dataset.k; v[k] = el.type === "checkbox" ? el.checked : el.type === "number" ? Math.max(0, parseInt(el.value || "0", 10)) : el.value.trim(); });
-      sb.from("delivery_zones").update(v).eq("id", Number(s.dataset.save)).then(function (r) { toast(r.error ? "Error: " + r.error.message : "Saved"); });
-    } else if (d) {
-      if (d.dataset.sure) { sb.from("delivery_zones").delete().eq("id", Number(d.dataset.del)).then(function (r) { toast(r.error ? "Error: " + r.error.message : "Deleted"); loadZones(); }); }
-      else { d.dataset.sure = "1"; d.textContent = "Tap again"; }
-    }
-  });
-  $("addZone").addEventListener("submit", function (e) {
-    e.preventDefault();
-    sb.from("delivery_zones").insert({ name: $("nzName").value.trim(), fee_fils: parseInt($("nzFee").value, 10) }).then(function (r) { if (r.error) { toast("Error: " + r.error.message); return; } $("addZone").reset(); loadZones(); toast("Area added"); });
+    var file = $("npFile").files[0];
+    var make = function (url) {
+      return sb.from("products").insert({ name: $("npName").value.trim(), category: $("npCat").value, price_fils: parseInt($("npPrice").value, 10), cost_fils: parseInt($("npCost").value || "0", 10), stock: parseInt($("npStock").value, 10), description: $("npDesc").value.trim(), image: url || null, allow_preorder: $("npPre").checked, sort: 100 });
+    };
+    (file ? uploadPhoto(file) : Promise.resolve(null)).then(make).then(function (r) {
+      if (r.error) { toast("Error: " + r.error.message); return; }
+      toast("Product added"); $("addProduct").reset(); loadStock();
+    }, function (err) { toast(err.message); });
   });
 
   /* ---------- reviews ---------- */
@@ -293,8 +252,7 @@
   /* ---------- visitors ---------- */
   function loadViews() {
     sb.from("page_views").select("visitor_id,device,at").order("at", { ascending: false }).limit(5000).then(function (r) {
-      var rows = r.data || [], today = dayKey(new Date());
-      var uniq = {}; rows.forEach(function (x) { uniq[x.visitor_id] = 1; });
+      var rows = r.data || [], today = dayKey(new Date()), uniq = {}; rows.forEach(function (x) { uniq[x.visitor_id] = 1; });
       var td = rows.filter(function (x) { return dayKey(x.at) === today; }).length;
       $("vStats").innerHTML = [[rows.length, "Views (latest 5000)"], [Object.keys(uniq).length, "Visitors"], [td, "Views today"]].map(function (c) { return '<div class="stat"><b>' + c[0] + '</b><span>' + c[1] + '</span></div>'; }).join("");
       var days = {}; for (var i = 0; i < 14; i++) { days[dayKey(Date.now() - i * 864e5)] = 0; }

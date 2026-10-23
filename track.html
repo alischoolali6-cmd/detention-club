@@ -37,6 +37,7 @@
       <h3 style="font-size:var(--text-md);margin-top:var(--space-lg)">Items</h3>
       <ul class="items-list" id="rItems"></ul>
       <div class="total-row"><span>Items</span><span class="price" id="rSub2"></span></div>
+      <div class="total-row" id="rDiscRow" hidden><span>Discount <span id="rPromo"></span></span><span class="price" id="rDisc"></span></div>
       <div class="total-row"><span>Delivery</span><span class="price" id="rFee"></span></div>
       <div class="total-row big"><span>Pay on delivery</span><span class="price" id="rTotal"></span></div>
 
@@ -69,11 +70,11 @@
   DC.mountChrome();
   DC.logView();
   var $ = function(id){ return document.getElementById(id); };
-  var STEPS = [["received","Order received"],["preparing","Preparing"],["ready","Ready for delivery"],["out_for_delivery","Out for delivery"],["delivered","Delivered"]];
+  var STEPS = [["received","Order received"],["preparing","Confirmed"],["ready","Ready for delivery"],["out_for_delivery","Out for delivery"],["delivered","Delivered"]];
   var MSG = {
-    received: "We got your order. We will start preparing it soon.",
-    preparing: "We are preparing your order.",
-    ready: "Your order is ready for delivery. A driver will pick it up shortly.",
+    received: "We have received your order. We will confirm it shortly.",
+    preparing: "Your order is confirmed. We usually deliver within 1 to 2 days.",
+    ready: "Your order is confirmed for delivery. A driver is being arranged.",
     out_for_delivery: "Your order is on its way. It will arrive today. Please keep your phone nearby and have cash ready.",
     delivered: "Your order was delivered. Thank you for shopping with Detention Club!",
     cancelled: "This order was cancelled. Contact "+DC.EMAIL+" if you have a question."
@@ -96,11 +97,12 @@
     $("rMsg").textContent = MSG[o.status] || "";
     var showPre = o.has_preorder && (o.status === "received" || o.status === "preparing");
     $("rPre").hidden = !showPre;
-    if(showPre) $("rPre").textContent = "Your order includes pre-order items. They take " + DC.PREORDER_DAYS + " days to arrive.";
+    if(showPre) $("rPre").textContent = "Some items in your order are not available in Bahrain. They are shipped from abroad, which delays delivery by " + DC.PREORDER_DAYS + " days.";
     $("rItems").innerHTML = o.items.map(function(i){
-      return '<li><span>' + i.qty + ' × ' + DC.esc(i.name) + (i.preorder_qty ? ' <span class="pre-tag">' + i.preorder_qty + ' pre-order</span>' : '') + '</span><span class="price">' + DC.money(i.unit_price_fils * i.qty) + '</span></li>';
+      return '<li><span>' + i.qty + ' × ' + DC.esc(i.name) + (i.preorder_qty ? ' <span class="pre-tag">' + i.preorder_qty + ' from abroad</span>' : '') + '</span><span class="price">' + DC.money(i.unit_price_fils * i.qty) + '</span></li>';
     }).join("");
     $("rSub2").textContent = DC.money(o.subtotal_fils);
+    $("rDiscRow").hidden = !o.discount_fils; $("rPromo").textContent = o.promo_code ? "(" + o.promo_code + ")" : ""; $("rDisc").textContent = "−" + DC.money(o.discount_fils || 0);
     $("rFee").textContent = o.delivery_fee_fils ? DC.money(o.delivery_fee_fils) : "—";
     $("rTotal").textContent = DC.money(o.total_fils);
     $("rTimeline").innerHTML = o.events.slice().reverse().map(function(e){ return '<li><span>' + (LABEL[e.status] || e.status) + '</span><span class="muted">' + fmt(e.at) + '</span></li>'; }).join("");

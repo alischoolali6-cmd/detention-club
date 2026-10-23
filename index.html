@@ -57,7 +57,7 @@
   <section id="shop" aria-label="Shop">
     <div class="sect-head">
       <h2>Shop all items</h2>
-      <p>Out of stock? You can still pre-order. Pre-orders arrive in 8-10 days.</p>
+      <p>Items marked "Not available in Bahrain" are shipped from abroad, which delays delivery by 8-10 days.</p>
     </div>
 
     <div class="shop-controls">
@@ -144,11 +144,15 @@
     return '<span class="card__placeholder"><span class="card__placeholder-icon">'+ICON+'</span><span class="card__placeholder-label">Photo coming soon</span></span>';
   }
   function badge(p){
+    if(DC.soldOut(p)) return '<span class="card__badge card__badge--out">Sold out</span>';
     if(p.stock <= 0) return '<span class="card__badge card__badge--pre">Pre-order</span>';
     if(p.stock <= 4) return '<span class="card__badge">Only '+p.stock+' left</span>';
     return '';
   }
-  function availText(p){ return p.stock > 0 ? "In stock" : "Pre-order · "+DC.PREORDER_DAYS+" days"; }
+  function availText(p){
+    if(DC.soldOut(p)) return "Sold out";
+    return p.stock > 0 ? "In stock" : "Not available in Bahrain · shipped from abroad · +"+DC.PREORDER_DAYS+" days";
+  }
 
   function buildTabs(){
     var all = [{key:"all", label:"All Products", color:"var(--color-ink)"}].concat(Object.keys(DC.CATS).map(function(k){ return {key:k, label:DC.CATS[k].label, color:DC.CATS[k].color}; }));
@@ -180,7 +184,7 @@
           '<span class="stock-note'+(p.stock>0?'':' pre')+'">'+availText(p)+'</span>'+
           '<div class="card__foot"><span class="price">'+DC.money(p.price_fils)+'</span>'+
           '<span class="card__actions"><button class="card__view" data-view="'+p.id+'">Details</button>'+
-          '<button class="card__add" data-add="'+p.id+'">'+(p.stock>0?'Add':'Pre-order')+'</button></span></div>'+
+          '<button class="card__add" data-add="'+p.id+'"'+(DC.soldOut(p)?' disabled':'')+'>'+(DC.soldOut(p)?'Sold out':p.stock>0?'Add':'Pre-order')+'</button></span></div>'+
         '</div></article>';
     }).join("");
   }
@@ -188,7 +192,7 @@
   var dlg = document.getElementById("productDialog"), dlgId = null;
   grid.addEventListener("click", function(e){
     var add = e.target.closest("[data-add]"), view = e.target.closest("[data-view]");
-    if(add){ DC.addToCart(add.getAttribute("data-add")); toast("Added to cart"); return; }
+    if(add){ toast(DC.addToCart(add.getAttribute("data-add")) ? "Added to cart" : "No more in stock"); return; }
     if(view){
       var p = DC.byId(view.getAttribute("data-view")); if(!p) return;
       dlgId = p.id;
@@ -199,11 +203,11 @@
       document.getElementById("dlgCat").textContent = c.label;
       document.getElementById("dlgAvail").textContent = availText(p);
       document.getElementById("dlgDesc").textContent = p.description;
-      document.getElementById("dlgAdd").textContent = p.stock > 0 ? "Add to cart" : "Pre-order · "+DC.PREORDER_DAYS+" days";
+      var da = document.getElementById("dlgAdd"); da.disabled = DC.soldOut(p); da.textContent = DC.soldOut(p) ? "Sold out" : p.stock > 0 ? "Add to cart" : "Pre-order (+"+DC.PREORDER_DAYS+" days)";
       dlg.showModal();
     }
   });
-  document.getElementById("dlgAdd").addEventListener("click", function(){ if(dlgId){ DC.addToCart(dlgId); toast("Added to cart"); dlg.close(); } });
+  document.getElementById("dlgAdd").addEventListener("click", function(){ if(dlgId){ toast(DC.addToCart(dlgId) ? "Added to cart" : "No more in stock"); dlg.close(); } });
   document.getElementById("dlgClose").addEventListener("click", function(){ dlg.close(); });
   dlg.addEventListener("click", function(e){ if(e.target === dlg) dlg.close(); });
 

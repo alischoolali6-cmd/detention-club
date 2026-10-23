@@ -16,7 +16,7 @@
   /* ---------- loading ---------- */
   function loadLedger() { return sb.from("ledger").select("*").order("at", { ascending: false }).limit(3000).then(function (r) { ledger = r.data || []; }); }
   function loadRestocks() { return sb.from("restocks").select("*, restock_items(*)").order("ordered_at", { ascending: false }).limit(200).then(function (r) { restocks = r.data || []; }); }
-  A.extraLoad = function () { return Promise.all([loadLedger(), loadRestocks()]).then(renderAll); };
+  A.loaders.push(function () { return Promise.all([loadLedger(), loadRestocks()]); });
   A.hooks.push(renderAll);
 
   /* ---------- restock maths ---------- */
@@ -77,14 +77,18 @@
     var otherExp = -sum(ledger.filter(function (x) { return x.category === "other_expense" && inPeriod(x.at); }), function (x) { return x.amount_fils; });
     var otherInc = sum(ledger.filter(function (x) { return x.category === "other_income" && inPeriod(x.at); }), function (x) { return x.amount_fils; });
     var temu = -sum(ledger.filter(function (x) { return x.category === "restock" && inPeriod(x.at); }), function (x) { return x.amount_fils; });
-    var profit = collected - cogs - delCost - otherExp + otherInc;
+    var discounts = 0;
+    sales.forEach(function (x) { var o = byId[x.order_id]; if (o) discounts += o.discount_fils || 0; });
+    var writeoffs = sum((A.data.adjustments || []).filter(function (a) { return inPeriod(a.at); }), function (a) { return a.qty * (a.unit_cost_fils || 0); });
+    var profit = collected - cogs - delCost - otherExp - writeoffs + otherInc;
     var placed = A.orders().filter(function (o) { return o.status !== "cancelled" && inPeriod(o.created_at); });
     var cells = [
       [bd(balance()), "Bank balance now"], [bd(collected), "Money collected (delivered)"], [bd(cogs), "Cost of items sold"], [bd(delCost), "Delivery costs"],
-      [bd(otherExp), "Other expenses"], [bd(profit), "PROFIT"], [bd(temu), "Spent on Temu (not in profit)"], [placed.length + " · " + bd(sum(placed, function (o) { return o.total_fils; })), "Orders placed · value"], [sales.length, "Orders delivered"]
+      [bd(otherExp), "Other expenses"], [bd(discounts), "Lost to discounts (promo codes)"], [bd(writeoffs), "Lost to free stock and write-offs (at cost)"], [bd(profit), "PROFIT"], [bd(temu), "Spent on Temu (not in profit)"], [placed.length + " · " + bd(sum(placed, function (o) { return o.total_fils; })), "Orders placed · value"], [sales.length, "Orders delivered"]
     ];
     $("moneyStats").innerHTML = cells.map(function (c) { return '<div class="stat"><b' + (c[1] === "PROFIT" ? ' style="color:' + (profit < 0 ? "var(--color-pink)" : "var(--color-blue)") + '"' : "") + ">" + esc(c[0]) + "</b><span>" + c[1] + "</span></div>"; }).join("");
     var notes = [];
+    notes.push("Discounts are already taken out of your profit. They are shown so you can see what the promo codes cost you. Free stock and write-offs are counted at your cost price and also reduce profit.");
     if (unknownCost) notes.push("Some items sold have no cost saved, so profit looks too high. Set your cost per item in Stock & prices.");
     if (sales.some(function (x) { var o = byId[x.order_id]; return o && o.delivery_cost_fils == null; })) notes.push("Some orders have no Parcel price entered. Until you enter it, delivery is counted as break-even (the delivery fee the customer paid).");
     $("moneyNote").hidden = !notes.length; $("moneyNote").textContent = notes.join(" ");

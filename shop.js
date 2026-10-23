@@ -4,6 +4,7 @@
   var cfg = window.DC_CONFIG || {};
   var EMAIL = "detentionclub0@gmail.com";
   var PREORDER_DAYS = "8-10";
+  var ABROAD = "Not available in Bahrain. Shipped from abroad, which delays delivery by " + PREORDER_DAYS + " days.";
 
   var CATS = {
     fidget:   { label: "Fidget & Stretch",    color: "var(--color-lime)" },
@@ -16,18 +17,18 @@
 
   // Shown only if Supabase is not connected yet (preview mode).
   var FALLBACK = [
-    { id: 1, name: "Stretchy Toy", category: "fidget", price_fils: 300, stock: 24, description: "Stretch it, twist it, snap it back — endlessly fidget-friendly.", image: "images/stretchy-toy.jpeg" },
-    { id: 2, name: "Fashionable Glasses", category: "style", price_fils: 500, stock: 30, description: "Bold, oversized frames that turn any outfit into a look.", image: "images/fashionable-glasses.jpeg" },
-    { id: 3, name: "Cheer Megaphones", category: "style", price_fils: 500, stock: 4, description: "Get loud and proud — perfect for cheering on your favorites.", image: "images/cheer-megaphones.jpeg" },
-    { id: 4, name: "Fidget Pop-Ups", category: "fidget", price_fils: 300, stock: 50, description: "The click-and-pop favorite, restocked and ready for recess.", image: "images/fidget-pop-ups.jpeg" },
-    { id: 5, name: "Banana Squishies", category: "squish", price_fils: 700, stock: 10, description: "Slow-rise banana squishies, soft and satisfying to squeeze.", image: "images/banana-squishies.jpeg" },
-    { id: 6, name: "3D-Printed Gradient Items", category: "creative", price_fils: 500, stock: 10, description: "Small printed shapes with a smooth color-gradient finish, one-of-a-kind desk decor.", image: "images/3d-printed-gradient-items.jpeg" },
-    { id: 7, name: "Small Keychains", category: "style", price_fils: 200, stock: 50, description: "Clip-on keychains to decorate your bag or keys.", image: "images/small-keychains.jpeg" },
-    { id: 8, name: "Silicone Cup Phone Holders", category: "useful", price_fils: 500, stock: 50, description: "A soft silicone cup stand that keeps your phone propped up and steady.", image: "images/silicone-cup-phone-holders.jpeg" },
-    { id: 9, name: "Mini Colorful Rings", category: "style", price_fils: 300, stock: 48, description: "Tiny stackable rings in a rainbow of colors.", image: "images/mini-colorful-rings.jpeg" },
-    { id: 10, name: "Watermelon Squishies", category: "squish", price_fils: 500, stock: 30, description: "Slow-rise watermelon slices, soft and satisfying to squeeze.", image: "images/watermelon-squishies.jpeg" },
-    { id: 11, name: "Payment Star", category: "special", price_fils: 2000, stock: 2, description: "A rare special find — grab one before it is gone.", image: "images/payment-star.jpeg" },
-    { id: 12, name: "Invisible Pens", category: "useful", price_fils: 500, stock: 20, description: "Write a secret message that only shows up under UV light.", image: "images/invisible-pens.jpeg" }
+    { id: 1, name: "Stretchy Toy", category: "fidget", price_fils: 300, allow_preorder: true, stock: 24, description: "Stretch it, twist it, snap it back — endlessly fidget-friendly.", image: "images/stretchy-toy.jpeg" },
+    { id: 2, name: "Fashionable Glasses", category: "style", price_fils: 500, allow_preorder: true, stock: 30, description: "Bold, oversized frames that turn any outfit into a look.", image: "images/fashionable-glasses.jpeg" },
+    { id: 3, name: "Cheer Megaphones", category: "style", price_fils: 500, allow_preorder: true, stock: 4, description: "Get loud and proud — perfect for cheering on your favorites.", image: "images/cheer-megaphones.jpeg" },
+    { id: 4, name: "Fidget Pop-Ups", category: "fidget", price_fils: 300, allow_preorder: true, stock: 50, description: "The click-and-pop favorite, restocked and ready for recess.", image: "images/fidget-pop-ups.jpeg" },
+    { id: 5, name: "Banana Squishies", category: "squish", price_fils: 700, allow_preorder: true, stock: 10, description: "Slow-rise banana squishies, soft and satisfying to squeeze.", image: "images/banana-squishies.jpeg" },
+    { id: 6, name: "3D-Printed Gradient Items", category: "creative", price_fils: 500, allow_preorder: true, stock: 10, description: "Small printed shapes with a smooth color-gradient finish, one-of-a-kind desk decor.", image: "images/3d-printed-gradient-items.jpeg" },
+    { id: 7, name: "Small Keychains", category: "style", price_fils: 200, allow_preorder: true, stock: 50, description: "Clip-on keychains to decorate your bag or keys.", image: "images/small-keychains.jpeg" },
+    { id: 8, name: "Silicone Cup Phone Holders", category: "useful", price_fils: 500, allow_preorder: true, stock: 50, description: "A soft silicone cup stand that keeps your phone propped up and steady.", image: "images/silicone-cup-phone-holders.jpeg" },
+    { id: 9, name: "Mini Colorful Rings", category: "style", price_fils: 300, allow_preorder: true, stock: 48, description: "Tiny stackable rings in a rainbow of colors.", image: "images/mini-colorful-rings.jpeg" },
+    { id: 10, name: "Watermelon Squishies", category: "squish", price_fils: 500, allow_preorder: true, stock: 30, description: "Slow-rise watermelon slices, soft and satisfying to squeeze.", image: "images/watermelon-squishies.jpeg" },
+    { id: 11, name: "Payment Star", category: "special", price_fils: 2000, allow_preorder: true, stock: 2, description: "A rare special find — grab one before it is gone.", image: "images/payment-star.jpeg" },
+    { id: 12, name: "Invisible Pens", category: "useful", price_fils: 500, allow_preorder: true, stock: 20, description: "Write a secret message that only shows up under UV light.", image: "images/invisible-pens.jpeg" }
   ];
 
   var sb = null;
@@ -58,8 +59,9 @@
   var listeners = [];
   function saveCart() { try { localStorage.setItem("dc_cart", JSON.stringify(cart)); } catch (e) {} listeners.forEach(function (f) { f(); }); }
   function cartCount() { var n = 0; for (var k in cart) n += cart[k]; return n; }
-  function addToCart(id, n) { id = String(id); cart[id] = Math.min(20, (cart[id] || 0) + (n || 1)); saveCart(); }
-  function setQty(id, q) { id = String(id); if (q <= 0) delete cart[id]; else cart[id] = Math.min(20, q); saveCart(); }
+  function cap(id, q) { var p = byId(id); var max = p && p.allow_preorder === false ? Math.max(0, p.stock) : 20; return Math.min(20, max, q); }
+  function addToCart(id, n) { id = String(id); var q = cap(id, (cart[id] || 0) + (n || 1)); if (q <= 0) return false; cart[id] = q; saveCart(); return true; }
+  function setQty(id, q) { id = String(id); q = cap(id, q); if (q <= 0) delete cart[id]; else cart[id] = q; saveCart(); }
   function clearCart() { cart = {}; saveCart(); }
   function cartLines() {
     var out = [];
@@ -67,7 +69,7 @@
       var p = byId(k);
       if (!p) continue;
       var qty = cart[k];
-      var pre = Math.max(0, qty - p.stock);
+      var pre = p.allow_preorder === false ? 0 : Math.max(0, qty - p.stock);
       out.push({ p: p, qty: qty, pre: pre, total: p.price_fils * qty });
     }
     return out;
@@ -148,13 +150,13 @@
       var img = l.p.image ? '<img src="' + esc(l.p.image) + '" alt="">' : '<div class="ph"></div>';
       return '<div class="line">' + img + '<div><b>' + esc(l.p.name) + '</b><span class="price">' + money(l.p.price_fils) + '</span>' +
         '<div class="qty"><button data-act="dec" data-id="' + l.p.id + '" aria-label="Fewer">−</button><span>' + l.qty + '</span><button data-act="inc" data-id="' + l.p.id + '" aria-label="More">+</button></div>' +
-        (l.pre ? '<div class="stock-note pre">' + l.pre + ' pre-order · ' + PREORDER_DAYS + ' days</div>' : '') + '</div>' +
+        (l.pre ? '<div class="stock-note pre">' + l.pre + ' not available in Bahrain · ships from abroad, +' + PREORDER_DAYS + ' days</div>' : '') + '</div>' +
         '<div style="text-align:right"><span class="price">' + money(l.total) + '</span><br><button class="link-btn" data-act="rm" data-id="' + l.p.id + '">Remove</button></div></div>';
     }).join("");
     var hasPre = lines.some(function (l) { return l.pre > 0; });
     foot.innerHTML = '<div class="total-row"><span>Items</span><span class="price">' + money(cartSubtotal()) + '</span></div>' +
       '<p class="stock-note">Delivery fee is added at checkout by area. Pay cash on delivery.</p>' +
-      (hasPre ? '<p class="notice blue">Some items are pre-order and take ' + PREORDER_DAYS + ' days.</p>' : '') +
+      (hasPre ? '<p class="notice blue">Some items are not available in Bahrain. They are shipped from abroad, which delays delivery by ' + PREORDER_DAYS + ' days.</p>' : '') +
       '<a class="btn btn--block" href="checkout.html">Checkout</a>';
   }
 
@@ -174,6 +176,7 @@
   }
 
   window.DC = {
+    ABROAD: ABROAD, soldOut: function (p) { return p.stock <= 0 && p.allow_preorder === false; },
     cfg: cfg, sb: sb, EMAIL: EMAIL, PREORDER_DAYS: PREORDER_DAYS, CATS: CATS,
     esc: esc, money: money, moneyFull: moneyFull,
     loadProducts: loadProducts, byId: byId, isLive: function () { return live; }, products: function () { return products; },

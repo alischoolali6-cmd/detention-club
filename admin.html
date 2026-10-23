@@ -36,6 +36,7 @@
       <button class="tab" data-tab="money" aria-pressed="false">Money</button>
       <button class="tab" data-tab="restock" aria-pressed="false">Restock <span id="restockBadge"></span></button>
       <button class="tab" data-tab="stock" aria-pressed="false">Stock &amp; prices</button>
+      <button class="tab" data-tab="promos" aria-pressed="false">Promo codes</button>
       <button class="tab" data-tab="zones" aria-pressed="false">Delivery fees</button>
       <button class="tab" data-tab="reviews" aria-pressed="false">Reviews</button>
       <button class="tab" data-tab="visitors" aria-pressed="false">Visitors</button>
@@ -46,11 +47,16 @@
     <div id="tab-orders">
       <div class="stats" id="stats"></div>
       <div class="form-card" style="margin-bottom:var(--space-md)">
-        <div class="actions"><button class="btn btn--blue btn--sm" id="promptBtn">Daily prompt for Claude</button><button class="btn btn--ghost btn--sm" id="previewBtn">Preview the two emails</button><span class="stock-note">Builds one prompt from today's ready and out-for-delivery orders. Paste it into Claude Cowork.</span></div>
+        <div class="actions" style="align-items:center">
+          <button class="btn btn--blue btn--sm" id="p1Btn">Prompt 1: Confirmation emails</button>
+          <button class="btn btn--blue btn--sm" id="p2Btn">Prompt 2: Parcel + delivery emails</button>
+          <button class="btn btn--ghost btn--sm" id="previewBtn">Preview the 3 emails</button>
+        </div>
+        <p class="stock-note" style="margin-top:6px">Press <b>Confirm order</b> on each order during the day. At the end of the day press Prompt 1 and paste it into Claude Cowork to send the confirmation emails. Then press <b>Confirm for delivery</b> on the orders you want delivered and use Prompt 2 to book the Parcel drivers and send the delivery-day emails.</p>
         <div id="previewBox" hidden style="display:grid;gap:var(--space-md);margin-top:var(--space-md)">
-          <div><h3 style="font-size:var(--text-md)">Email 1: Order confirmation (send after you approve, for orders with items in stock)</h3><pre id="previewConfirm" class="notice" style="white-space:pre-wrap;font-family:inherit;font-weight:500"></pre></div>
-          <div><h3 style="font-size:var(--text-md)">Email 3: Pre-order (for orders with pre-order items, instead of Email 1)</h3><pre id="previewPre" class="notice" style="white-space:pre-wrap;font-family:inherit;font-weight:500"></pre></div>
-          <div><h3 style="font-size:var(--text-md)">Email 2: Delivery day</h3><pre id="previewDelivery" class="notice" style="white-space:pre-wrap;font-family:inherit;font-weight:500"></pre></div>
+          <div><h3 style="font-size:var(--text-md)">Email 1: Order confirmation (arrives in 1 to 2 days)</h3><pre id="previewConfirm" class="notice" style="white-space:pre-wrap;font-family:inherit;font-weight:500"></pre></div>
+          <div><h3 style="font-size:var(--text-md)">Email 2: Pre-order (items not available in Bahrain)</h3><pre id="previewPre" class="notice" style="white-space:pre-wrap;font-family:inherit;font-weight:500"></pre></div>
+          <div><h3 style="font-size:var(--text-md)">Email 3: Delivery day (arrives today)</h3><pre id="previewDelivery" class="notice" style="white-space:pre-wrap;font-family:inherit;font-weight:500"></pre></div>
         </div>
         <div class="field" id="promptBox" hidden style="margin-top:var(--space-sm)"><textarea id="promptText" rows="12" readonly></textarea><div class="actions"><button class="btn btn--ghost btn--sm" id="promptCopy">Copy prompt</button></div></div>
       </div>
@@ -101,29 +107,76 @@
 
     <!-- STOCK -->
     <div id="tab-stock" hidden>
-      <p class="muted" style="margin-bottom:var(--space-md)">Set stock to 0 and customers see "Pre-order, 8-10 days". Prices are in fils (1000 fils = 1 BD). Untick Show to hide a product.</p>
+      <p class="muted" style="margin-bottom:var(--space-md)">Everything about your products is here. Prices and costs are in fils (1000 fils = 1 BD). <b>Pre-order OK</b> lets customers order more than you have; the item then shows "Not available in Bahrain, +8-10 days". With it unticked, customers can only buy what is in stock.</p>
       <div class="form-card table-wrap"><table class="t" id="stockTable"></table></div>
+
       <h2 style="font-size:var(--text-lg);margin-top:var(--space-xl)">Add a product</h2>
       <form class="form-card form-grid" id="addProduct" style="margin-top:var(--space-sm);max-width:36rem">
         <label class="field">Name<input id="npName" required></label>
         <label class="field">Category<select id="npCat"></select></label>
-        <label class="field">Price (fils)<input id="npPrice" type="number" min="0" required></label>
+        <label class="field">Selling price (fils)<input id="npPrice" type="number" min="0" required></label>
+        <label class="field">Your cost (fils)<input id="npCost" type="number" min="0" value="0"></label>
         <label class="field">Stock<input id="npStock" type="number" min="0" value="0" required></label>
         <label class="field">Description<input id="npDesc"></label>
-        <label class="field">Photo file name (optional)<input id="npImg" placeholder="images/my-photo.jpeg"><small>Ask Claude to add the photo file to the website first.</small></label>
+        <label class="field">Photo (optional)<input id="npFile" type="file" accept="image/*"></label>
+        <label class="check"><input type="checkbox" id="npPre" checked><span>Allow pre-orders when out of stock</span></label>
         <button class="btn" type="submit">Add product</button>
       </form>
+
+      <h2 style="font-size:var(--text-lg);margin-top:var(--space-xl)">Give away or write off stock</h2>
+      <p class="muted">Use this for samples to show people, gifts, or damaged items. It takes the items out of your stock and records the loss at your cost price. It shows in the Money tab.</p>
+      <form class="form-card form-grid" id="adjForm" style="margin-top:var(--space-sm);max-width:36rem">
+        <label class="field">Item<select id="adjProduct"></select></label>
+        <label class="field">How many<input id="adjQty" type="number" min="1" value="1" required></label>
+        <label class="field">Reason<select id="adjReason"><option value="sample">Sample to show people</option><option value="gift">Gift / giveaway</option><option value="damaged">Damaged or lost</option><option value="other">Other</option></select></label>
+        <label class="field">Note (optional)<input id="adjNote" placeholder="e.g. School fair table"></label>
+        <button class="btn" type="submit">Take out of stock</button>
+      </form>
+      <div class="form-card table-wrap" style="margin-top:var(--space-md)"><table class="t" id="adjTable"></table></div>
     </div>
 
-    <!-- ZONES -->
-    <div id="tab-zones" hidden>
-      <p class="muted" style="margin-bottom:var(--space-md)">Customers choose their area at checkout and the fee is added to their total. Fees are in fils.</p>
-      <div class="form-card table-wrap"><table class="t" id="zoneTable"></table></div>
-      <form class="form-card form-grid" id="addZone" style="margin-top:var(--space-md);max-width:30rem">
-        <label class="field">Area name<input id="nzName" required></label>
-        <label class="field">Delivery fee (fils)<input id="nzFee" type="number" min="0" required></label>
-        <button class="btn" type="submit">Add area</button>
+    <!-- PROMO CODES -->
+    <div id="tab-promos" hidden>
+      <p class="muted" style="margin-bottom:var(--space-md)">Create a code for a person or group. Customers enter it at checkout. Discounts apply to the items, not to delivery. Use hard-to-guess codes.</p>
+      <form class="form-card form-grid" id="promoForm" style="max-width:36rem">
+        <h3 style="font-size:var(--text-md)">New promo code</h3>
+        <label class="field">Code (letters and numbers)<input id="pcCode" required maxlength="30" autocapitalize="characters" placeholder="e.g. SARA10"></label>
+        <label class="field">Discount type<select id="pcKind"><option value="percent">Percent off (%)</option><option value="fixed">Fixed amount off (BD)</option></select></label>
+        <label class="field"><span id="pcValueLabel">Percent</span><input id="pcValue" type="number" step="0.001" min="0.001" required></label>
+        <label class="field">Who is it for (note)<input id="pcNote" placeholder="e.g. Sara's class"></label>
+        <label class="field">Minimum order (BD, optional)<input id="pcMin" type="number" step="0.001" min="0"></label>
+        <label class="field">Maximum number of uses (optional)<input id="pcMax" type="number" min="1"></label>
+        <label class="field">Expires on (optional)<input id="pcExp" type="date"></label>
+        <button class="btn" type="submit">Create code</button>
       </form>
+      <h2 style="font-size:var(--text-lg);margin-top:var(--space-xl)">Your codes</h2>
+      <div class="form-card table-wrap" style="margin-top:var(--space-sm)"><table class="t" id="promoTable"></table></div>
+    </div>
+
+    <!-- DELIVERY FEES (by block) -->
+    <div id="tab-zones" hidden>
+      <p class="muted" style="margin-bottom:var(--space-md)">Customers enter their block number at checkout and see the delivery fee for it. Once you add prices here, an order needs a block that has a price.</p>
+      <div class="form-card form-grid" style="max-width:44rem">
+        <h3 style="font-size:var(--text-md)">Get the prices from Parcel with Claude Cowork</h3>
+        <label class="field">My home address (where drivers pick up)<input id="homeAddr" placeholder="Building, road, block, area"></label>
+        <label class="field">Block numbers to price<textarea id="blockList" placeholder="e.g. 901-935, 1001, 1002"></textarea><small>Use commas and ranges like 901-935.</small></label>
+        <div class="actions"><button class="btn btn--blue btn--sm" id="p3Btn" type="button">Make the prompt</button><button class="btn btn--ghost btn--sm" id="p3Copy" type="button" hidden>Copy prompt</button></div>
+        <textarea id="p3Text" rows="12" hidden readonly></textarea>
+      </div>
+      <form class="form-card form-grid" id="importForm" style="margin-top:var(--space-md);max-width:44rem">
+        <h3 style="font-size:var(--text-md)">Import prices</h3>
+        <label class="field">One line per block: block, price in BD<textarea id="importText" rows="6" placeholder="929, 1.200&#10;932, 1.500"></textarea></label>
+        <button class="btn btn--sm" type="submit">Import</button>
+      </form>
+      <form class="form-card form-grid" id="blockForm" style="margin-top:var(--space-md);max-width:30rem">
+        <h3 style="font-size:var(--text-md)">Add or change one block</h3>
+        <label class="field">Block number<input id="nbBlock" type="number" min="1" max="9999" required></label>
+        <label class="field">Delivery fee (BD)<input id="nbFee" type="number" step="0.001" min="0" required></label>
+        <button class="btn btn--sm" type="submit">Save</button>
+      </form>
+      <h2 style="font-size:var(--text-lg);margin-top:var(--space-xl)">Block prices <span class="muted" id="blockCount"></span></h2>
+      <div class="field" style="max-width:16rem;margin-block:var(--space-sm)"><input id="blockSearch" type="search" placeholder="Search a block" aria-label="Search blocks"></div>
+      <div class="form-card table-wrap"><table class="t" id="blockTable"></table></div>
     </div>
 
     <!-- REVIEWS -->
@@ -140,7 +193,7 @@
     <div id="tab-data" hidden>
       <div class="form-card" style="max-width:40rem;display:grid;gap:var(--space-md)">
         <h2 style="font-size:var(--text-lg)">Delete customer details after 3 months</h2>
-        <p>For privacy, customer names, phone numbers, emails, addresses and notes are wiped from finished (delivered or cancelled) orders that are older than 3 months. Your money record, totals and items are kept, so profit history stays correct. Old visit counts are deleted too.</p>
+        <p>For privacy, customer names, phone numbers, emails, addresses, block numbers and notes are wiped from finished (delivered or cancelled) orders that are older than 3 months. Your money record, totals and items are kept, so profit history stays correct. Old visit counts are deleted too.</p>
         <p class="notice blue">Waiting to be cleaned right now: <b id="purgeCount">0</b> orders.</p>
         <div class="actions"><button class="btn btn--danger" id="purgeBtn">Delete old customer details now</button></div>
         <p class="stock-note">If Supabase's pg_cron is switched on, this also runs by itself every Sunday at 03:00.</p>
@@ -152,7 +205,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
+<script src="admin-emails.js"></script>
 <script src="admin.js"></script>
 <script src="admin-money.js"></script>
+<script src="admin-more.js"></script>
 </body>
 </html>
