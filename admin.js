@@ -17,7 +17,7 @@
   var sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 
   var STATUS = { received: "New", preparing: "Preparing", ready: "Ready for delivery", out_for_delivery: "Out for delivery", delivered: "Delivered", cancelled: "Cancelled" };
-  var NEXT = { received: ["preparing", "Start preparing"], preparing: ["ready", "Mark ready for delivery"], ready: ["out_for_delivery", "Out for delivery"], out_for_delivery: ["delivered", "Mark delivered"] };
+  var NEXT = { received: ["preparing", "Approve order"], preparing: ["ready", "Mark ready for delivery"], ready: ["out_for_delivery", "Out for delivery"], out_for_delivery: ["delivered", "Mark delivered"] };
   var CATS = { fidget: "Fidget & Stretch", squish: "Squish Zone", style: "Style & Accessories", useful: "Cool & Useful", creative: "Creative & Novelty", special: "Special Finds" };
   var FILTERS = [["active", "Active"], ["received", "New"], ["pre", "Pre-orders"], ["preparing", "Preparing"], ["ready", "Ready"], ["out_for_delivery", "Out for delivery"], ["delivered", "Delivered"], ["cancelled", "Cancelled"], ["all", "All"]];
   var orders = [], filter = "active", q = "", openIds = {}, confirmCancel = null, timer = null;
@@ -32,6 +32,12 @@
     });
   });
   $("logoutBtn").addEventListener("click", function () { sb.auth.signOut().then(function () { location.reload(); }); });
+  $("previewBtn").addEventListener("click", function () {
+    var o = sampleOrder();
+    $("previewBox").hidden = !$("previewBox").hidden;
+    $("previewConfirm").textContent = "Subject: " + emailSubject(o, "confirm") + "\n\n" + emailText(o, "confirm");
+    $("previewDelivery").textContent = "Subject: " + emailSubject(o, "delivery") + "\n\n" + emailText(o, "delivery");
+  });
   $("promptBtn").addEventListener("click", function () { $("promptText").value = buildPrompt(); $("promptBox").hidden = false; });
   $("promptCopy").addEventListener("click", function () { (navigator.clipboard ? navigator.clipboard.writeText($("promptText").value) : Promise.reject()).then(function () { toast("Prompt copied"); }, function () { $("promptText").select(); toast("Press Cmd+C to copy"); }); });
   $("refreshBtn").addEventListener("click", function () { loadAll(true); });
@@ -84,30 +90,61 @@
   }
   function itemsText(o) { return (o.order_items || []).map(function (i) { return i.qty + " x " + i.name + (i.preorder_qty ? " (" + i.preorder_qty + " pre-order)" : ""); }).join(", "); }
   function digits(p) { var d = String(p).replace(/[^0-9]/g, ""); return d.length === 8 ? "973" + d : d; }
-  function trackLink(o) { return location.origin + location.pathname.replace(/admin\.html$/, "").replace(/\/$/, "") + "/track.html?code=" + o.code; }
-  function emailText(o) {
-    var link = trackLink(o), first = o.customer_name.split(" ")[0];
-    var intro = o.status === "delivered" ? "Thank you for your order " + o.code + "." : "Your order " + o.code + " will arrive through the day. Please keep your phone nearby and have " + bd(o.total_fils) + " in cash ready.";
-    return "Dear " + first + ",\n\n" + intro + "\n\nTrack your order: " + link +
-      "\n\nIf you received your order, please review us on our website: " + link +
+  function trackLink(o) { return location.origin + location.pathname.replace(/\/admin(\.html)?\/?$/, "").replace(/\/$/, "") + "/track.html?code=" + o.code; }
+  function itemLines(o) {
+    return (o.order_items || []).map(function (i) {
+      return "  - " + i.qty + " x " + i.name + " (" + bd(i.unit_price_fils * i.qty) + ")" + (i.preorder_qty ? " - " + i.preorder_qty + " pre-order, arrives in 8-10 days" : "");
+    }).join("\n");
+  }
+  function emailSubject(o, kind) {
+    return kind === "confirm" ? "Thank you for ordering from Detention Club (order " + o.code + ")" : "Your Detention Club order " + o.code + " arrives today";
+  }
+  function emailText(o, kind) {
+    var first = o.customer_name.split(" ")[0], link = trackLink(o);
+    var summary = "Order code: " + o.code + "\n" + itemLines(o) + "\n" +
+      "  Items: " + bd(o.subtotal_fils) + "\n  Delivery: " + (o.delivery_fee_fils ? bd(o.delivery_fee_fils) : "to be confirmed by phone") + "\n  Total to pay in cash on delivery: " + bd(o.total_fils);
+    var pre = o.has_preorder ? "\nSome items in your order are pre-order items, which take 8-10 days to arrive. We will tell you when they are on their way.\n" : "";
+    if (kind === "confirm") {
+      return "Dear " + first + ",\n\nThank you for ordering from Detention Club! We have received and approved your order.\n\n" + summary +
+        "\n\nDelivery address: " + (o.area ? o.area + ", " : "") + o.address + "\n" + pre +
+        "\nYou pay in cash when your order arrives. Please keep your phone nearby so our driver can reach you.\n\nYou can follow your order at any time on our website with your order code:\n" + link +
+        "\n\nFor inquiries and birthday parties, please contact detentionclub0@gmail.com.\n\nKind regards,\nDetention Club";
+    }
+    return "Dear " + first + ",\n\nGood news! Your Detention Club order " + o.code + " will arrive through the day today.\n\n" + summary +
+      "\n\nDelivery address: " + (o.area ? o.area + ", " : "") + o.address + "\n\nPlease keep your phone nearby and have " + bd(o.total_fils) + " in cash ready for the driver.\n" +
+      "\nTrack your order here:\n" + link +
+      "\n\nOnce you have received your order, we would love a review. You can leave one on our website here:\n" + link +
       "\n\nFor inquiries and birthday parties, please contact detentionclub0@gmail.com.\n\nKind regards,\nDetention Club";
   }
-  function mailLink(o) {
-    return "mailto:" + encodeURIComponent(o.email) + "?subject=" + encodeURIComponent("Your Detention Club order " + o.code) + "&body=" + encodeURIComponent(emailText(o));
+  function mailLink(o, kind) {
+    return "mailto:" + encodeURIComponent(o.email) + "?subject=" + encodeURIComponent(emailSubject(o, kind)) + "&body=" + encodeURIComponent(emailText(o, kind));
   }
   function buildPrompt() {
-    var list = orders.filter(function (o) { return o.status === "ready" || o.status === "out_for_delivery"; });
-    if (!list.length) return "There are no orders marked Ready for delivery or Out for delivery right now.";
-    var t = "You are helping me run Detention Club, a student-run toy store in Bahrain. Today there are " + list.length + " order(s) to deliver.\n\n" +
-      "PART 1 - PARCEL APP (on this laptop)\nFor each order marked READY below, open the Parcel app and create a delivery. Enter ONLY: the items price, the customer phone number and the customer location. Never enter any payment details. For every order, STOP before the final step that orders the driver, tell me what you filled in, and wait for me to say 'approved'.\n\n" +
-      "PART 2 - CUSTOMER EMAILS (from detentionclub0@gmail.com)\nAfter I approve an order, send that customer the email below. Show me the draft first and send it only after I say 'send'. Do not send anything else.\n\n";
-    list.forEach(function (o, n) {
-      t += "---- ORDER " + (n + 1) + " of " + list.length + " (" + (o.status === "ready" ? "READY: book a driver" : "ALREADY OUT FOR DELIVERY: only send the email") + ") ----\n" +
-        "Code: " + o.code + "\nCustomer: " + o.customer_name + "\nPhone: " + o.phone + "\nEmail: " + o.email + "\nLocation: " + (o.area ? o.area + ", " : "") + o.address + (o.notes ? "\nNotes: " + o.notes : "") +
-        "\nItems: " + itemsText(o) + "\nItems price (enter in Parcel): " + bd(o.subtotal_fils) + "\nCash to collect: " + bd(o.total_fils) +
-        "\nEmail subject: Your Detention Club order " + o.code + "\nEmail body:\n" + emailText(o) + "\n\n";
-    });
-    return t + "When everything is done, give me a short summary: which orders have a driver booked and which emails were sent.";
+    var conf = orders.filter(function (o) { return o.status === "preparing" && !o.confirm_emailed_at; });
+    var rdy = orders.filter(function (o) { return o.status === "ready" || o.status === "out_for_delivery"; });
+    var del = rdy.filter(function (o) { return !o.delivery_emailed_at; });
+    if (!conf.length && !rdy.length) return "There is nothing to do right now: no approved orders waiting for a confirmation email and no orders ready for delivery.";
+    var t = "You are helping me run Detention Club, a student-run toy store in Bahrain. Do the tasks below in order. Never enter payment details anywhere. Never send an email without showing me the draft and waiting for me to say 'send'.\n\n";
+    if (conf.length) {
+      t += "TASK 1 - CONFIRMATION EMAILS (from detentionclub0@gmail.com)\nThese orders are approved. Email each customer the confirmation below.\n\n";
+      conf.forEach(function (o, n) { t += "-- Confirmation " + (n + 1) + " of " + conf.length + " (order " + o.code + ") --\nTo: " + o.email + "\nSubject: " + emailSubject(o, "confirm") + "\nBody:\n" + emailText(o, "confirm") + "\n\n"; });
+    }
+    if (rdy.length) {
+      t += "TASK 2 - PARCEL APP (on this laptop)\nFor each order marked READY below, open the Parcel app and create a delivery. Enter ONLY the items price, the customer phone number and the customer location. For every order STOP before the final step that orders the driver, tell me what you filled in, and wait for me to say 'approved'.\n\n";
+      rdy.forEach(function (o, n) {
+        t += "-- Delivery " + (n + 1) + " of " + rdy.length + " (" + (o.status === "ready" ? "READY: book a driver" : "already out for delivery: no booking needed") + ") --\nCode: " + o.code + "\nCustomer: " + o.customer_name + "\nPhone: " + o.phone +
+          "\nLocation: " + (o.area ? o.area + ", " : "") + o.address + (o.notes ? "\nNotes: " + o.notes : "") + "\nItems: " + itemsText(o) + "\nItems price (enter in Parcel): " + bd(o.subtotal_fils) + "\nCash to collect: " + bd(o.total_fils) + "\n\n";
+      });
+    }
+    if (del.length) {
+      t += "TASK 3 - DELIVERY DAY EMAILS (from detentionclub0@gmail.com)\nAfter I approve each driver booking, email that customer the delivery day email below.\n\n";
+      del.forEach(function (o, n) { t += "-- Delivery email " + (n + 1) + " of " + del.length + " (order " + o.code + ") --\nTo: " + o.email + "\nSubject: " + emailSubject(o, "delivery") + "\nBody:\n" + emailText(o, "delivery") + "\n\n"; });
+    }
+    return t + "When everything is done, give me a short summary listing the order codes: which confirmation emails were sent, which drivers are booked, and which delivery emails were sent.";
+  }
+  function sampleOrder() {
+    return { code: "DC-A1B2C3", customer_name: "Sara Ahmed", email: "sara@example.com", area: "Riffa", address: "Building 12, Road 34, Block 929", subtotal_fils: 2900, delivery_fee_fils: 1000, total_fils: 3900, has_preorder: true,
+      order_items: [{ name: "Small Keychains", qty: 2, preorder_qty: 0, unit_price_fils: 200 }, { name: "Payment Star", qty: 1, preorder_qty: 1, unit_price_fils: 2000 }, { name: "Mini Colorful Rings", qty: 1, preorder_qty: 0, unit_price_fils: 300 }, { name: "Banana Squishies", qty: 1, preorder_qty: 0, unit_price_fils: 700 }] };
   }
   function renderOrders() {
     renderStats();
@@ -130,7 +167,10 @@
         '<div class="actions">' +
         (next ? '<button class="btn btn--lime btn--sm" data-set="' + next[0] + '" data-id="' + o.id + '">' + next[1] + '</button>' : '') +
         '<button class="btn btn--ghost btn--sm" data-parcel="' + o.id + '">Copy for Parcel</button>' +
-        '<a class="btn btn--ghost btn--sm" href="' + mailLink(o) + '">Email customer</a>' +
+        '<a class="btn btn--ghost btn--sm" href="' + mailLink(o, "confirm") + '">Email 1: Confirmation' + (o.confirm_emailed_at ? " ✓" : "") + '</a>' +
+        '<a class="btn btn--ghost btn--sm" href="' + mailLink(o, "delivery") + '">Email 2: Delivery day' + (o.delivery_emailed_at ? " ✓" : "") + '</a>' +
+        '<button class="btn btn--ghost btn--sm" data-sent="confirm_emailed_at" data-id="' + o.id + '">' + (o.confirm_emailed_at ? "Unmark confirmation sent" : "Mark confirmation sent") + '</button>' +
+        '<button class="btn btn--ghost btn--sm" data-sent="delivery_emailed_at" data-id="' + o.id + '">' + (o.delivery_emailed_at ? "Unmark delivery email sent" : "Mark delivery email sent") + '</button>' +
         (isOpen(o) ? '<button class="btn btn--danger btn--sm" data-cancel="' + o.id + '">' + (confirmCancel === o.id ? "Tap again to cancel" : "Cancel order") + '</button>' : '') +
         (o.status === "cancelled" ? '<button class="btn btn--ghost btn--sm" data-set="received" data-id="' + o.id + '">Reopen</button>' : '') +
         '</div></div></details>';
@@ -143,6 +183,8 @@
   $("orderSearch").addEventListener("input", function (e) { q = e.target.value; renderOrders(); });
   $("orderList").addEventListener("toggle", function (e) { var d = e.target; if (d.dataset && d.dataset.id) openIds[d.dataset.id] = d.open; }, true);
   $("orderList").addEventListener("click", function (e) {
+    var sent = e.target.closest("[data-sent]");
+    if (sent) { var oo = orders.filter(function (x) { return x.id === sent.dataset.id; })[0], patch = {}; patch[sent.dataset.sent] = oo[sent.dataset.sent] ? null : new Date().toISOString(); sb.from("orders").update(patch).eq("id", sent.dataset.id).then(function (r) { if (r.error) { toast("Run the new SQL first (email tracking)"); return; } loadOrders(); }); return; }
     var set = e.target.closest("[data-set]"), par = e.target.closest("[data-parcel]"), can = e.target.closest("[data-cancel]");
     if (set) { setStatus(set.dataset.id, set.dataset.set); }
     else if (par) {

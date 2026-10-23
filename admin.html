@@ -42,7 +42,11 @@
     <div id="tab-orders">
       <div class="stats" id="stats"></div>
       <div class="form-card" style="margin-bottom:var(--space-md)">
-        <div class="actions"><button class="btn btn--blue btn--sm" id="promptBtn">Daily prompt for Claude</button><span class="stock-note">Builds one prompt from today's ready and out-for-delivery orders. Paste it into Claude Cowork.</span></div>
+        <div class="actions"><button class="btn btn--blue btn--sm" id="promptBtn">Daily prompt for Claude</button><button class="btn btn--ghost btn--sm" id="previewBtn">Preview the two emails</button><span class="stock-note">Builds one prompt from today's ready and out-for-delivery orders. Paste it into Claude Cowork.</span></div>
+        <div id="previewBox" hidden style="display:grid;gap:var(--space-md);margin-top:var(--space-md)">
+          <div><h3 style="font-size:var(--text-md)">Email 1: Order confirmation (send after you approve)</h3><pre id="previewConfirm" class="notice" style="white-space:pre-wrap;font-family:inherit;font-weight:500"></pre></div>
+          <div><h3 style="font-size:var(--text-md)">Email 2: Delivery day</h3><pre id="previewDelivery" class="notice" style="white-space:pre-wrap;font-family:inherit;font-weight:500"></pre></div>
+        </div>
         <div class="field" id="promptBox" hidden style="margin-top:var(--space-sm)"><textarea id="promptText" rows="12" readonly></textarea><div class="actions"><button class="btn btn--ghost btn--sm" id="promptCopy">Copy prompt</button></div></div>
       </div>
       <div class="tabs" id="orderFilters"></div>

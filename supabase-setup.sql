@@ -79,6 +79,9 @@ create table if not exists page_views (
   at timestamptz not null default now()
 );
 
+alter table orders add column if not exists confirm_emailed_at timestamptz;
+alter table orders add column if not exists delivery_emailed_at timestamptz;
+
 create index if not exists orders_created_idx on orders (created_at desc);
 create index if not exists orders_phone_idx on orders (phone, created_at desc);
 create index if not exists order_items_order_idx on order_items (order_id);
