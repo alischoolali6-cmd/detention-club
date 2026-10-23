@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Checkout — Detention Club</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="chrome-header"></div>
+
+<main class="wrap page">
+  <h1>Checkout</h1>
+
+  <section id="emptyView" hidden style="padding:0">
+    <p class="muted">Your cart is empty.</p>
+    <p style="margin-top:var(--space-md)"><a class="btn" href="index.html#shop">Browse the shop</a></p>
+  </section>
+
+  <section id="doneView" hidden style="padding:0">
+    <div class="form-card" style="display:grid;gap:var(--space-md)">
+      <h2 style="font-size:var(--text-xl)">Order placed. Thank you!</h2>
+      <p>Your order code is:</p>
+      <div class="code-box" id="doneCode"></div>
+      <div class="actions"><button class="btn btn--ghost" id="copyCode">Copy code</button><a class="btn" id="trackLink" href="track.html">Track my order</a></div>
+      <p class="notice">Save this code. You need it to track your order when you come back to the website. We will also contact you on the phone number you gave.</p>
+      <p id="donePre" class="notice blue" hidden></p>
+      <p>Total to pay in cash on delivery: <b id="doneTotal"></b></p>
+    </div>
+  </section>
+
+  <section id="formView" hidden style="padding:0">
+    <div class="two-col">
+      <form class="form-card" id="orderForm" novalidate>
+        <div class="form-grid">
+          <label class="field">Full name<input id="fName" autocomplete="name" required maxlength="80"></label>
+          <label class="field">Phone number<input id="fPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="e.g. 3XXX XXXX" required maxlength="20"><small>We call or message this number to arrange delivery.</small></label>
+          <label class="field">Email<input id="fEmail" type="email" autocomplete="email" required maxlength="120"></label>
+          <label class="field" id="zoneField" hidden>Delivery area<select id="fZone"></select></label>
+          <label class="field" id="areaField">Area / town<input id="fArea" autocomplete="address-level2" maxlength="80" placeholder="e.g. Riffa, Block 929"></label>
+          <label class="field">Full delivery address<textarea id="fAddress" autocomplete="street-address" required maxlength="300" placeholder="Building, road, block, landmarks"></textarea></label>
+          <label class="field">Notes for the driver (optional)<input id="fNotes" maxlength="200"></label>
+          <label class="check"><input type="checkbox" id="fTerms"><span>I have read and agree to the <a href="terms.html" target="_blank" rel="noopener">Terms and Privacy Policy</a>. I confirm this is a genuine order and I understand that a fake order can be fined BD 50 and may lead to legal action under the laws of Bahrain.</span></label>
+          <p class="err" id="formErr" role="alert"></p>
+          <button class="btn btn--block" id="placeBtn" type="submit">Place order (cash on delivery)</button>
+        </div>
+      </form>
+
+      <aside class="form-card" aria-label="Order summary">
+        <h2 style="font-size:var(--text-lg);margin-bottom:var(--space-sm)">Your order</h2>
+        <ul class="items-list" id="sumItems"></ul>
+        <div class="total-row"><span>Items</span><span class="price" id="sumSub"></span></div>
+        <div class="total-row"><span>Delivery</span><span class="price" id="sumFee"></span></div>
+        <hr style="border:none;border-top:2px solid var(--color-ink)">
+        <div class="total-row big"><span>Total</span><span class="price" id="sumTotal"></span></div>
+        <p class="stock-note" style="margin-top:var(--space-sm)">Pay cash to the driver when your order arrives.</p>
+        <p id="sumPre" class="notice blue" style="margin-top:var(--space-sm)" hidden></p>
+        <p style="margin-top:var(--space-sm)"><a class="link-btn" href="index.html#shop">← Keep shopping</a></p>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<div id="chrome-footer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="shop.js"></script>
+<script>
+(function(){
+  "use strict";
+  DC.mountChrome();
+  DC.logView();
+  var $ = function(id){ return document.getElementById(id); };
+  var zones = [];
+
+  function fee(){
+    if(!zones.length) return 0;
+    var z = zones.filter(function(x){ return String(x.id) === $("fZone").value; })[0];
+    return z ? z.fee_fils : 0;
+  }
+  function renderSummary(){
+    var lines = DC.cartLines();
+    $("sumItems").innerHTML = lines.map(function(l){
+      return '<li><span>'+l.qty+' × '+DC.esc(l.p.name)+(l.pre?' <span class="pre-tag">'+l.pre+' pre-order</span>':'')+'</span><span class="price">'+DC.money(l.total)+'</span></li>';
+    }).join("");
+    var sub = DC.cartSubtotal(), f = fee();
+    $("sumSub").textContent = DC.money(sub);
+    $("sumFee").textContent = zones.length ? DC.money(f) : "Confirmed by phone";
+    $("sumTotal").textContent = DC.money(sub + f);
+    var pre = lines.some(function(l){ return l.pre > 0; });
+    $("sumPre").hidden = !pre;
+    if(pre) $("sumPre").textContent = "Pre-order items take "+DC.PREORDER_DAYS+" days to arrive. The rest of your order is prepared first.";
+  }
+  function showState(){
+    var n = DC.cartLines().length;
+    $("emptyView").hidden = n > 0 || !$("doneView").hidden;
+    $("formView").hidden = n === 0 || !$("doneView").hidden;
+    if(n) renderSummary();
+  }
+
+  DC.loadProducts().then(function(){
+    var p = DC.sb ? DC.sb.from("delivery_zones").select("*").eq("active", true).order("name") : null;
+    return p ? p.then(function(r){ zones = (r && r.data) || []; }, function(){}) : null;
+  }).then(function(){
+    if(zones.length){
+      $("zoneField").hidden = false;
+      $("fZone").innerHTML = '<option value="">Choose your area…</option>' + zones.map(function(z){ return '<option value="'+z.id+'">'+DC.esc(z.name)+' — '+DC.money(z.fee_fils)+'</option>'; }).join("");
+      $("areaField").querySelector("input").placeholder = "Block / road (optional)";
+    }
+    showState();
+    DC.onCart(showState);
+  });
+  $("fZone").addEventListener("change", renderSummary);
+
+  $("orderForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var err = $("formErr"); err.textContent = "";
+    var name = $("fName").value.trim(), phone = $("fPhone").value.trim(), email = $("fEmail").value.trim(), addr = $("fAddress").value.trim();
+    var digits = phone.replace(/[^0-9]/g, "");
+    if(name.length < 2){ err.textContent = "Please enter your full name."; return; }
+    if(digits.length < 8){ err.textContent = "Please enter a valid phone number."; return; }
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent = "Please enter a valid email address."; return; }
+    if(zones.length && !$("fZone").value){ err.textContent = "Please choose your delivery area."; return; }
+    if(addr.length < 5){ err.textContent = "Please enter your full delivery address."; return; }
+    if(!$("fTerms").checked){ err.textContent = "Please tick the box to accept the terms and privacy policy."; return; }
+    if(!DC.sb){ err.textContent = "The store is not connected to its database yet, so orders cannot be placed."; return; }
+
+    var items = DC.cartLines().map(function(l){ return { product_id: l.p.id, qty: l.qty }; });
+    var zoneName = zones.length ? (zones.filter(function(z){ return String(z.id) === $("fZone").value; })[0] || {}).name : "";
+    var area = [zoneName, $("fArea").value.trim()].filter(Boolean).join(" — ");
+    var btn = $("placeBtn"); btn.disabled = true; btn.textContent = "Placing order…";
+    DC.sb.rpc("place_order", {
+      p_name: name, p_phone: phone, p_email: email, p_address: addr, p_area: area,
+      p_zone_id: zones.length ? Number($("fZone").value) : null, p_notes: $("fNotes").value.trim() || null,
+      p_items: items, p_accepted: true
+    }).then(function(r){
+      if(r.error){ err.textContent = (r.error.message || "Could not place the order.").replace(/^.*?:\s*/, ""); btn.disabled = false; btn.textContent = "Place order (cash on delivery)"; return; }
+      var o = r.data;
+      try { localStorage.setItem("dc_last_code", o.code); var all = JSON.parse(localStorage.getItem("dc_codes") || "[]"); all.unshift(o.code); localStorage.setItem("dc_codes", JSON.stringify(all.slice(0, 10))); } catch(x){}
+      DC.clearCart();
+      $("doneCode").textContent = o.code;
+      $("trackLink").href = "track.html?code=" + encodeURIComponent(o.code);
+      $("doneTotal").textContent = DC.money(o.total_fils);
+      if(o.has_preorder){ $("donePre").hidden = false; $("donePre").textContent = "Your order includes pre-order items. They take "+DC.PREORDER_DAYS+" days to arrive."; }
+      $("doneView").hidden = false; $("formView").hidden = true; $("emptyView").hidden = true;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, function(){ err.textContent = "Could not reach the server. Please try again."; btn.disabled = false; btn.textContent = "Place order (cash on delivery)"; });
+  });
+
+  $("copyCode").addEventListener("click", function(){
+    var c = $("doneCode").textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(c) : Promise.reject()).then(function(){ $("copyCode").textContent = "Copied ✓"; }, function(){
+      var r = document.createRange(); r.selectNode($("doneCode")); getSelection().removeAllRanges(); getSelection().addRange(r);
+    });
+  });
+})();
+</script>
+</body>
+</html>

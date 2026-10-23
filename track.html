@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Track Your Order — Detention Club</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="chrome-header"></div>
+
+<main class="wrap page">
+  <h1>Track your order</h1>
+  <p class="muted" style="max-width:52ch">Enter the order code you got when you placed your order. It looks like DC-AB12CD.</p>
+
+  <form class="form-card" id="trackForm" style="margin-top:var(--space-lg);max-width:34rem">
+    <div class="form-grid">
+      <label class="field">Order code<input id="codeIn" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DC-XXXXXX" maxlength="16"></label>
+      <p class="err" id="trackErr" role="alert"></p>
+      <button class="btn" type="submit">Track order</button>
+      <div id="savedBox" hidden><span class="stock-note">Your recent orders:</span> <span id="savedCodes"></span></div>
+    </div>
+  </form>
+
+  <section id="result" hidden style="padding:var(--space-xl) 0 0">
+    <div class="form-card" style="max-width:46rem">
+      <div style="display:flex;justify-content:space-between;gap:var(--space-md);flex-wrap:wrap;align-items:center">
+        <h2 id="rCode" style="font-size:var(--text-xl);font-family:var(--font-outlier)"></h2>
+        <span class="status" id="rStatus"></span>
+      </div>
+      <p id="rSub" class="muted" style="margin-top:4px"></p>
+      <div class="stepper" id="stepper" aria-label="Order progress"></div>
+      <p class="notice" id="rMsg"></p>
+      <p class="notice blue" id="rPre" style="margin-top:var(--space-sm)" hidden></p>
+
+      <h3 style="font-size:var(--text-md);margin-top:var(--space-lg)">Items</h3>
+      <ul class="items-list" id="rItems"></ul>
+      <div class="total-row"><span>Items</span><span class="price" id="rSub2"></span></div>
+      <div class="total-row"><span>Delivery</span><span class="price" id="rFee"></span></div>
+      <div class="total-row big"><span>Pay on delivery</span><span class="price" id="rTotal"></span></div>
+
+      <h3 style="font-size:var(--text-md);margin-top:var(--space-lg)">History</h3>
+      <ul class="timeline" id="rTimeline"></ul>
+    </div>
+
+    <div class="form-card" id="reviewBox" hidden style="max-width:46rem;margin-top:var(--space-lg)">
+      <h2 style="font-size:var(--text-lg)">How was your order?</h2>
+      <p class="muted">Your review appears on our website after we approve it.</p>
+      <form id="reviewForm" class="form-grid" style="margin-top:var(--space-sm)">
+        <div class="stars" id="stars" role="radiogroup" aria-label="Rating"></div>
+        <label class="field">Your review<textarea id="rText" maxlength="600" placeholder="Tell us what you thought"></textarea></label>
+        <p class="err" id="rvErr" role="alert"></p>
+        <button class="btn" type="submit">Send review</button>
+      </form>
+    </div>
+    <p id="reviewDone" class="notice" hidden style="max-width:46rem;margin-top:var(--space-lg)">Thank you for your review!</p>
+  </section>
+</main>
+
+<div id="chrome-footer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="shop.js"></script>
+<script>
+(function(){
+  "use strict";
+  DC.mountChrome();
+  DC.logView();
+  var $ = function(id){ return document.getElementById(id); };
+  var STEPS = [["received","Order received"],["preparing","Preparing"],["ready","Ready for delivery"],["out_for_delivery","Out for delivery"],["delivered","Delivered"]];
+  var MSG = {
+    received: "We got your order. We will start preparing it soon.",
+    preparing: "We are preparing your order.",
+    ready: "Your order is ready for delivery. A driver will pick it up shortly.",
+    out_for_delivery: "Your order is on its way. It will arrive today. Please keep your phone nearby and have cash ready.",
+    delivered: "Your order was delivered. Thank you for shopping with Detention Club!",
+    cancelled: "This order was cancelled. Contact "+DC.EMAIL+" if you have a question."
+  };
+  var LABEL = {}; STEPS.forEach(function(s){ LABEL[s[0]] = s[1]; }); LABEL.cancelled = "Cancelled";
+  var currentCode = null, rating = 0;
+
+  function fmt(d){ return new Date(d).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); }
+
+  function show(o){
+    currentCode = o.code;
+    $("result").hidden = false;
+    $("rCode").textContent = o.code;
+    var st = $("rStatus"); st.textContent = LABEL[o.status] || o.status; st.className = "status " + o.status;
+    $("rSub").textContent = "Placed " + fmt(o.created_at) + (o.area ? " · " + o.area : "");
+    var idx = STEPS.map(function(s){ return s[0]; }).indexOf(o.status);
+    $("stepper").innerHTML = o.status === "cancelled" ? "" : STEPS.map(function(s, i){
+      return '<div class="' + (i < idx || o.status === "delivered" ? "done" : i === idx ? "done now" : "") + '"><i></i>' + s[1] + '</div>';
+    }).join("");
+    $("rMsg").textContent = MSG[o.status] || "";
+    var showPre = o.has_preorder && (o.status === "received" || o.status === "preparing");
+    $("rPre").hidden = !showPre;
+    if(showPre) $("rPre").textContent = "Your order includes pre-order items. They take " + DC.PREORDER_DAYS + " days to arrive.";
+    $("rItems").innerHTML = o.items.map(function(i){
+      return '<li><span>' + i.qty + ' × ' + DC.esc(i.name) + (i.preorder_qty ? ' <span class="pre-tag">' + i.preorder_qty + ' pre-order</span>' : '') + '</span><span class="price">' + DC.money(i.unit_price_fils * i.qty) + '</span></li>';
+    }).join("");
+    $("rSub2").textContent = DC.money(o.subtotal_fils);
+    $("rFee").textContent = o.delivery_fee_fils ? DC.money(o.delivery_fee_fils) : "—";
+    $("rTotal").textContent = DC.money(o.total_fils);
+    $("rTimeline").innerHTML = o.events.slice().reverse().map(function(e){ return '<li><span>' + (LABEL[e.status] || e.status) + '</span><span class="muted">' + fmt(e.at) + '</span></li>'; }).join("");
+    var canReview = o.status === "delivered" && !o.reviewed;
+    $("reviewBox").hidden = !canReview;
+    $("reviewDone").hidden = !(o.status === "delivered" && o.reviewed);
+    try { localStorage.setItem("dc_last_code", o.code); } catch(e){}
+  }
+
+  function lookup(code){
+    $("trackErr").textContent = "";
+    code = (code || "").trim().toUpperCase();
+    if(!code){ $("trackErr").textContent = "Please enter your order code."; return; }
+    if(!DC.sb){ $("trackErr").textContent = "Tracking is not connected yet."; return; }
+    DC.sb.rpc("track_order", { p_code: code }).then(function(r){
+      if(r.error){ $("trackErr").textContent = "Could not reach the server. Please try again."; return; }
+      if(!r.data){ $("result").hidden = true; $("trackErr").textContent = "We could not find that code. Check it and try again."; return; }
+      show(r.data);
+    });
+  }
+
+  $("trackForm").addEventListener("submit", function(e){ e.preventDefault(); lookup($("codeIn").value); });
+
+  // stars
+  $("stars").innerHTML = [1,2,3,4,5].map(function(n){ return '<button type="button" data-n="'+n+'" role="radio" aria-checked="false" aria-label="'+n+' star'+(n>1?'s':'')+'">★</button>'; }).join("");
+  $("stars").addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return; rating = Number(b.dataset.n);
+    $("stars").querySelectorAll("button").forEach(function(x){ var on = Number(x.dataset.n) <= rating; x.classList.toggle("on", on); x.setAttribute("aria-checked", Number(x.dataset.n) === rating ? "true" : "false"); });
+  });
+  $("reviewForm").addEventListener("submit", function(e){
+    e.preventDefault(); $("rvErr").textContent = "";
+    if(!rating){ $("rvErr").textContent = "Please choose 1 to 5 stars."; return; }
+    DC.sb.rpc("submit_review", { p_code: currentCode, p_rating: rating, p_comment: $("rText").value }).then(function(r){
+      if(r.error){ $("rvErr").textContent = (r.error.message || "Could not send review.").replace(/^.*?:\s*/, ""); return; }
+      $("reviewBox").hidden = true; $("reviewDone").hidden = false;
+    });
+  });
+
+  // saved codes + prefill
+  var saved = []; try { saved = JSON.parse(localStorage.getItem("dc_codes") || "[]"); } catch(e){}
+  if(saved.length){
+    $("savedBox").hidden = false;
+    $("savedCodes").innerHTML = saved.map(function(c){ return '<button type="button" class="link-btn" data-c="'+DC.esc(c)+'" style="margin-right:10px">'+DC.esc(c)+'</button>'; }).join("");
+    $("savedCodes").addEventListener("click", function(e){ var b = e.target.closest("[data-c]"); if(b){ $("codeIn").value = b.dataset.c; lookup(b.dataset.c); } });
+  }
+  var q = new URLSearchParams(location.search).get("code"), last = ""; try { last = localStorage.getItem("dc_last_code") || ""; } catch(e){}
+  var start = q || last;
+  if(start){ $("codeIn").value = start; lookup(start); }
+})();
+</script>
+</body>
+</html>
