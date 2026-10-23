@@ -41,6 +41,10 @@
     <!-- ORDERS -->
     <div id="tab-orders">
       <div class="stats" id="stats"></div>
+      <div class="form-card" style="margin-bottom:var(--space-md)">
+        <div class="actions"><button class="btn btn--blue btn--sm" id="promptBtn">Daily prompt for Claude</button><span class="stock-note">Builds one prompt from today's ready and out-for-delivery orders. Paste it into Claude Cowork.</span></div>
+        <div class="field" id="promptBox" hidden style="margin-top:var(--space-sm)"><textarea id="promptText" rows="12" readonly></textarea><div class="actions"><button class="btn btn--ghost btn--sm" id="promptCopy">Copy prompt</button></div></div>
+      </div>
       <div class="tabs" id="orderFilters"></div>
       <div class="field" style="max-width:22rem;margin-bottom:var(--space-md)"><input id="orderSearch" type="search" placeholder="Search code, name or phone" aria-label="Search orders"></div>
       <div id="orderList"></div>

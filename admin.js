@@ -32,6 +32,8 @@
     });
   });
   $("logoutBtn").addEventListener("click", function () { sb.auth.signOut().then(function () { location.reload(); }); });
+  $("promptBtn").addEventListener("click", function () { $("promptText").value = buildPrompt(); $("promptBox").hidden = false; });
+  $("promptCopy").addEventListener("click", function () { (navigator.clipboard ? navigator.clipboard.writeText($("promptText").value) : Promise.reject()).then(function () { toast("Prompt copied"); }, function () { $("promptText").select(); toast("Press Cmd+C to copy"); }); });
   $("refreshBtn").addEventListener("click", function () { loadAll(true); });
 
   function enter() {
@@ -82,15 +84,30 @@
   }
   function itemsText(o) { return (o.order_items || []).map(function (i) { return i.qty + " x " + i.name + (i.preorder_qty ? " (" + i.preorder_qty + " pre-order)" : ""); }).join(", "); }
   function digits(p) { var d = String(p).replace(/[^0-9]/g, ""); return d.length === 8 ? "973" + d : d; }
-  function mailLink(o) {
-    var site = location.origin + location.pathname.replace(/admin\.html$/, "").replace(/\/$/, "");
-    var link = site + "/track.html?code=" + o.code;
-    var first = o.customer_name.split(" ")[0];
+  function trackLink(o) { return location.origin + location.pathname.replace(/admin\.html$/, "").replace(/\/$/, "") + "/track.html?code=" + o.code; }
+  function emailText(o) {
+    var link = trackLink(o), first = o.customer_name.split(" ")[0];
     var intro = o.status === "delivered" ? "Thank you for your order " + o.code + "." : "Your order " + o.code + " will arrive through the day. Please keep your phone nearby and have " + bd(o.total_fils) + " in cash ready.";
-    var body = "Dear " + first + ",\n\n" + intro + "\n\nTrack your order: " + link +
+    return "Dear " + first + ",\n\n" + intro + "\n\nTrack your order: " + link +
       "\n\nIf you received your order, please review us on our website: " + link +
       "\n\nFor inquiries and birthday parties, please contact detentionclub0@gmail.com.\n\nKind regards,\nDetention Club";
-    return "mailto:" + encodeURIComponent(o.email) + "?subject=" + encodeURIComponent("Your Detention Club order " + o.code) + "&body=" + encodeURIComponent(body);
+  }
+  function mailLink(o) {
+    return "mailto:" + encodeURIComponent(o.email) + "?subject=" + encodeURIComponent("Your Detention Club order " + o.code) + "&body=" + encodeURIComponent(emailText(o));
+  }
+  function buildPrompt() {
+    var list = orders.filter(function (o) { return o.status === "ready" || o.status === "out_for_delivery"; });
+    if (!list.length) return "There are no orders marked Ready for delivery or Out for delivery right now.";
+    var t = "You are helping me run Detention Club, a student-run toy store in Bahrain. Today there are " + list.length + " order(s) to deliver.\n\n" +
+      "PART 1 - PARCEL APP (on this laptop)\nFor each order marked READY below, open the Parcel app and create a delivery. Enter ONLY: the items price, the customer phone number and the customer location. Never enter any payment details. For every order, STOP before the final step that orders the driver, tell me what you filled in, and wait for me to say 'approved'.\n\n" +
+      "PART 2 - CUSTOMER EMAILS (from detentionclub0@gmail.com)\nAfter I approve an order, send that customer the email below. Show me the draft first and send it only after I say 'send'. Do not send anything else.\n\n";
+    list.forEach(function (o, n) {
+      t += "---- ORDER " + (n + 1) + " of " + list.length + " (" + (o.status === "ready" ? "READY: book a driver" : "ALREADY OUT FOR DELIVERY: only send the email") + ") ----\n" +
+        "Code: " + o.code + "\nCustomer: " + o.customer_name + "\nPhone: " + o.phone + "\nEmail: " + o.email + "\nLocation: " + (o.area ? o.area + ", " : "") + o.address + (o.notes ? "\nNotes: " + o.notes : "") +
+        "\nItems: " + itemsText(o) + "\nItems price (enter in Parcel): " + bd(o.subtotal_fils) + "\nCash to collect: " + bd(o.total_fils) +
+        "\nEmail subject: Your Detention Club order " + o.code + "\nEmail body:\n" + emailText(o) + "\n\n";
+    });
+    return t + "When everything is done, give me a short summary: which orders have a driver booked and which emails were sent.";
   }
   function renderOrders() {
     renderStats();
