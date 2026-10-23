@@ -9,3 +9,9 @@ The website is already built. It needs a Supabase project to take orders.
 5. Open **Project Settings > API** and copy the **Project URL** and the **anon public** key. Give them to Claude (or paste them into `config.js`). Never share the `service_role` key.
 
 After that, every change Claude pushes goes live on the same link.
+
+## Upgrade 2 (money, restock, 3-month cleanup)
+
+In Supabase SQL Editor, run `supabase-migration-2.sql` once (after `supabase-setup.sql`). It is safe to run again.
+Then in the admin: Money tab (set the starting bank balance), Stock & prices (enter your cost per item), Restock tab.
+Optional: Database > Extensions > turn on `pg_cron`, then run the migration again to schedule the weekly cleanup.
