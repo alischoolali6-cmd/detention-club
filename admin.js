@@ -26,7 +26,7 @@
   sb.auth.getSession().then(function (r) { if (r.data.session) enter(); });
   $("loginForm").addEventListener("submit", function (e) {
     e.preventDefault(); $("lErr").textContent = "";
-    sb.auth.signInWithPassword({ email: $("lEmail").value.trim(), password: $("lPass").value }).then(function (r) {
+    sb.auth.signInWithPassword({ email: (function(u){ return u.indexOf("@") > -1 ? u : u.toLowerCase() + "@detentionclub.app"; })($("lEmail").value.trim()), password: $("lPass").value }).then(function (r) {
       if (r.error) { $("lErr").textContent = "Wrong email or password."; return; }
       enter();
     });
