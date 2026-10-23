@@ -98,7 +98,7 @@
         '<p class="foot-statement">SQUISH <span class="hl">•</span> STRETCH <span class="hl">•</span> POP <span class="hl">•</span> PLAY</p>' +
         '<p style="font-family:var(--font-display);font-weight:800;margin-top:var(--space-sm);">DETENTION CLUB</p>' +
         '<div class="foot-meta"><a href="index.html#shop">Shop</a><a href="track.html">Track your order</a><a href="terms.html">Terms &amp; Privacy</a>' +
-        '<a href="mailto:' + EMAIL + '">' + EMAIL + '</a><span>Cash on delivery</span></div>' +
+        '<a href="mailto:' + EMAIL + '">' + EMAIL + '</a><a href="admin.html">Admin</a><span>Cash on delivery</span></div>' +
         '<p class="foot-copy">Created by ALI.Y, DANNY &amp; ABR. A student-run business in Bahrain.</p>' +
         '</div></footer>';
     }
