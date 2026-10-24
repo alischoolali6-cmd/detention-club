@@ -6,7 +6,7 @@
 <title>Item — Detention Club</title>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="pdp-loading">
 <div id="chrome-header"></div>
 
 <main class="wrap">
@@ -32,7 +32,7 @@
   </section>
 
   <section class="related" id="related" hidden style="padding-block:var(--space-xl) var(--space-2xl)">
-    <h2>More like this</h2>
+    <h2>You may also like</h2>
     <div class="grid" id="relatedGrid"></div>
   </section>
 </main>
@@ -51,6 +51,8 @@
 <script>
 (function(){
   "use strict";
+  try { history.scrollRestoration = "manual"; } catch(e){}
+  window.scrollTo(0, 0);
   DC.mountChrome();
   DC.logView();
   var $ = function(id){ return document.getElementById(id); };
@@ -81,15 +83,17 @@
     $("barPrice").textContent = DC.money(p.price_fils); $("barNote").textContent = p.stock > 0 ? "In stock" : dis ? "Sold out" : "+" + DC.PREORDER_DAYS + " days";
     $("pdp").hidden = false; $("pdpBar").hidden = false; document.body.classList.add("has-pdp-bar");
 
-    var rel = DC.products().filter(function(x){ return x.category === p.category && x.id !== p.id; }).slice(0, 4);
+    var rel = DC.suggest([p.id], 8, [p.category]);
     if(rel.length){
       $("related").hidden = false;
       $("relatedGrid").innerHTML = rel.map(function(x){
         var cc = DC.CATS[x.category] || { color: "var(--color-paper-3)" };
+        var out = DC.soldOut(x);
         return '<article class="card"><div class="card__media" style="--cat-color:' + cc.color + '">' + (x.image ? '<img src="' + DC.esc(x.image) + '" alt="' + DC.esc(x.name) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover">' : '') + '</div>' +
-          '<div class="card__body"><h3 class="card__name"><a class="card__link" href="product.html?id=' + x.id + '">' + DC.esc(x.name) + '</a></h3><div class="card__foot"><span class="price">' + DC.money(x.price_fils) + '</span></div></div></article>';
+          '<div class="card__body"><h3 class="card__name"><a class="card__link" href="product.html?id=' + x.id + '#' + x.id + '">' + DC.esc(x.name) + '</a></h3><div class="card__foot"><span class="price">' + DC.money(x.price_fils) + '</span><button class="card__add" data-add="' + x.id + '"' + (out ? ' disabled' : '') + '>' + (out ? 'Sold out' : x.stock > 0 ? 'Add' : 'Pre-order') + '</button></div></div></article>';
       }).join("");
     }
+    document.body.classList.remove("pdp-loading");
   }
 
   function add(){
@@ -102,10 +106,18 @@
   $("qMinus").addEventListener("click", function(){ qty = Math.max(1, qty - 1); $("qVal").textContent = qty; });
   $("qPlus").addEventListener("click", function(){ qty = Math.min(20, qty + 1); $("qVal").textContent = qty; });
 
-  var id = Number(new URLSearchParams(location.search).get("id"));
+  $("relatedGrid").addEventListener("click", function(e){
+    var a = e.target.closest("[data-add]"); if(!a) return;
+    e.preventDefault(); toast(DC.addToCart(a.getAttribute("data-add")) ? "Added to cart" : "No more in stock");
+  });
+
+  var id = Number(new URLSearchParams(location.search).get("id") || location.hash.replace("#", "")), shown = false;
+  var first = DC.byId(id);
+  if(first){ show(first); shown = true; }            // instant, from the list the shop already loaded
   DC.loadProducts().then(function(){
     var p = DC.byId(id);
-    if(p) show(p); else $("notFound").hidden = false;
+    if(p){ if(!shown || JSON.stringify(p) !== JSON.stringify(first)) show(p); }
+    else { $("pdp").hidden = true; $("pdpBar").hidden = true; $("notFound").hidden = false; document.body.classList.remove("pdp-loading"); }
   });
 })();
 </script>

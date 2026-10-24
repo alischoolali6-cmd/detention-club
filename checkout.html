@@ -35,12 +35,26 @@
       <form class="form-card" id="orderForm" novalidate>
         <div class="form-grid">
           <label class="field">Full name<input id="fName" autocomplete="name" required maxlength="80"></label>
-          <label class="field">Phone number<input id="fPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="e.g. 3XXX XXXX" required maxlength="20"><small>Our driver calls this number on delivery.</small></label>
+          <div class="field"><span>Phone number</span>
+            <div class="phone-row"><select id="fCC" aria-label="Country code" autocomplete="tel-country-code"></select><input id="fPhone" type="tel" autocomplete="tel-national" inputmode="tel" placeholder="e.g. 3XXX XXXX" required maxlength="15" aria-label="Phone number"></div>
+            <small>Our driver calls this number on delivery.</small></div>
           <label class="field">Email<input id="fEmail" type="email" autocomplete="email" required maxlength="120"><small>We send your order confirmation here.</small></label>
-          <label class="field">Block number<input id="fBlock" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="e.g. 929" required><small id="blockInfo">Your delivery fee depends on your block.</small></label>
-          <label class="field">Area / town<input id="fArea" autocomplete="address-level2" maxlength="80" placeholder="e.g. Riffa"></label>
-          <label class="field">Full delivery address<textarea id="fAddress" autocomplete="street-address" required maxlength="300" placeholder="Building, road, flat, landmarks"></textarea></label>
-          <label class="field">Notes for the driver (optional)<input id="fNotes" maxlength="200"></label>
+
+          <h3 style="font-size:var(--text-md);margin-top:var(--space-sm)">Delivery address</h3>
+          <div class="row2">
+            <label class="field">Block number<input id="fBlock" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="e.g. 929" required></label>
+            <label class="field">Road / street number<input id="fRoad" inputmode="numeric" maxlength="12" placeholder="e.g. 34" required></label>
+          </div>
+          <small id="blockInfo" class="muted" style="font-weight:700">Your delivery fee depends on your block.</small>
+          <label class="field">Where do you live?
+            <select id="fType"><option value="House">House</option><option value="Villa">Villa</option><option value="Apartment">Apartment</option></select></label>
+          <label class="field"><span id="numLabel">House number</span><input id="fNum" maxlength="12" required></label>
+          <div class="row2" id="aptRow" hidden>
+            <label class="field">Flat number<input id="fFlat" maxlength="12"></label>
+            <label class="field">Floor<input id="fFloor" maxlength="12"></label>
+          </div>
+          <label class="field">Area / town (optional)<input id="fArea" autocomplete="address-level2" maxlength="80" placeholder="e.g. Riffa"></label>
+          <label class="field">Landmark or note for the driver (optional)<input id="fNotes" maxlength="200" placeholder="e.g. next to the mosque"></label>
           <label class="check"><input type="checkbox" id="fTerms"><span>I have read and agree to the <a href="terms.html" target="_blank" rel="noopener">Terms and Privacy Policy</a>. I confirm this is a genuine order and I understand that a fake order can be fined BD 50 and may lead to legal action under the laws of Bahrain.</span></label>
           <p class="err" id="formErr" role="alert"></p>
           <button class="btn btn--block" id="placeBtn" type="submit">Place order (cash on delivery)</button>
@@ -80,6 +94,10 @@
   DC.logView();
   var $ = function(id){ return document.getElementById(id); };
   var blocks = {}, haveBlocks = false, promo = null; // promo = {code, discount_fils, label}
+  var COUNTRIES = [["Afghanistan","+93"],["Albania","+355"],["Algeria","+213"],["Andorra","+376"],["Angola","+244"],["Argentina","+54"],["Armenia","+374"],["Australia","+61"],["Austria","+43"],["Azerbaijan","+994"],["Bahamas","+1"],["Bahrain","+973"],["Bangladesh","+880"],["Barbados","+1"],["Belarus","+375"],["Belgium","+32"],["Belize","+501"],["Benin","+229"],["Bhutan","+975"],["Bolivia","+591"],["Bosnia and Herzegovina","+387"],["Botswana","+267"],["Brazil","+55"],["Brunei","+673"],["Bulgaria","+359"],["Burkina Faso","+226"],["Burundi","+257"],["Cambodia","+855"],["Cameroon","+237"],["Canada","+1"],["Cape Verde","+238"],["Central African Republic","+236"],["Chad","+235"],["Chile","+56"],["China","+86"],["Colombia","+57"],["Comoros","+269"],["Congo (DRC)","+243"],["Congo (Republic)","+242"],["Costa Rica","+506"],["Croatia","+385"],["Cuba","+53"],["Cyprus","+357"],["Czechia","+420"],["Denmark","+45"],["Djibouti","+253"],["Dominican Republic","+1"],["Ecuador","+593"],["Egypt","+20"],["El Salvador","+503"],["Equatorial Guinea","+240"],["Eritrea","+291"],["Estonia","+372"],["Eswatini","+268"],["Ethiopia","+251"],["Fiji","+679"],["Finland","+358"],["France","+33"],["Gabon","+241"],["Gambia","+220"],["Georgia","+995"],["Germany","+49"],["Ghana","+233"],["Greece","+30"],["Guatemala","+502"],["Guinea","+224"],["Guinea-Bissau","+245"],["Guyana","+592"],["Haiti","+509"],["Honduras","+504"],["Hong Kong","+852"],["Hungary","+36"],["Iceland","+354"],["India","+91"],["Indonesia","+62"],["Iran","+98"],["Iraq","+964"],["Ireland","+353"],["Israel","+972"],["Italy","+39"],["Ivory Coast","+225"],["Jamaica","+1"],["Japan","+81"],["Jordan","+962"],["Kazakhstan","+7"],["Kenya","+254"],["Kuwait","+965"],["Kyrgyzstan","+996"],["Laos","+856"],["Latvia","+371"],["Lebanon","+961"],["Lesotho","+266"],["Liberia","+231"],["Libya","+218"],["Liechtenstein","+423"],["Lithuania","+370"],["Luxembourg","+352"],["Macau","+853"],["Madagascar","+261"],["Malawi","+265"],["Malaysia","+60"],["Maldives","+960"],["Mali","+223"],["Malta","+356"],["Mauritania","+222"],["Mauritius","+230"],["Mexico","+52"],["Moldova","+373"],["Monaco","+377"],["Mongolia","+976"],["Montenegro","+382"],["Morocco","+212"],["Mozambique","+258"],["Myanmar","+95"],["Namibia","+264"],["Nepal","+977"],["Netherlands","+31"],["New Zealand","+64"],["Nicaragua","+505"],["Niger","+227"],["Nigeria","+234"],["North Korea","+850"],["North Macedonia","+389"],["Norway","+47"],["Oman","+968"],["Pakistan","+92"],["Palestine","+970"],["Panama","+507"],["Papua New Guinea","+675"],["Paraguay","+595"],["Peru","+51"],["Philippines","+63"],["Poland","+48"],["Portugal","+351"],["Puerto Rico","+1"],["Qatar","+974"],["Romania","+40"],["Russia","+7"],["Rwanda","+250"],["Saudi Arabia","+966"],["Senegal","+221"],["Serbia","+381"],["Seychelles","+248"],["Sierra Leone","+232"],["Singapore","+65"],["Slovakia","+421"],["Slovenia","+386"],["Somalia","+252"],["South Africa","+27"],["South Korea","+82"],["South Sudan","+211"],["Spain","+34"],["Sri Lanka","+94"],["Sudan","+249"],["Suriname","+597"],["Sweden","+46"],["Switzerland","+41"],["Syria","+963"],["Taiwan","+886"],["Tajikistan","+992"],["Tanzania","+255"],["Thailand","+66"],["Togo","+228"],["Trinidad and Tobago","+1"],["Tunisia","+216"],["Turkey","+90"],["Turkmenistan","+993"],["Uganda","+256"],["Ukraine","+380"],["United Arab Emirates","+971"],["United Kingdom","+44"],["United States","+1"],["Uruguay","+598"],["Uzbekistan","+998"],["Venezuela","+58"],["Vietnam","+84"],["Yemen","+967"],["Zambia","+260"],["Zimbabwe","+263"]];
+  $("fCC").innerHTML = COUNTRIES.map(function(c){ return '<option value="'+c[1]+'"'+(c[0]==="Bahrain"?' selected':'')+'>'+DC.esc(c[0])+' ('+c[1]+')</option>'; }).join("");
+  function syncType(){ var t = $("fType").value, apt = t === "Apartment"; $("numLabel").textContent = apt ? "Building number" : t + " number"; $("aptRow").hidden = !apt; $("fFlat").required = apt; }
+  $("fType").addEventListener("change", syncType); syncType();
 
   function blockNum(){ var n = parseInt($("fBlock").value.replace(/[^0-9]/g, ""), 10); return isNaN(n) ? null : n; }
   function fee(){ if(!haveBlocks) return 0; var b = blockNum(); return b != null && blocks[b] != null ? blocks[b] : null; }
@@ -135,16 +153,20 @@
   $("orderForm").addEventListener("submit", function(e){
     e.preventDefault();
     var err = $("formErr"); err.textContent = "";
-    var name = $("fName").value.trim(), phone = $("fPhone").value.trim(), email = $("fEmail").value.trim(), addr = $("fAddress").value.trim();
-    var digits = phone.replace(/[^0-9]/g, ""), b = blockNum();
+    var name = $("fName").value.trim(), email = $("fEmail").value.trim(), b = blockNum();
+    var local = $("fPhone").value.replace(/[^0-9]/g, ""), cc = $("fCC").value, phone = cc + local;
+    var road = $("fRoad").value.trim(), num = $("fNum").value.trim(), type = $("fType").value, flat = $("fFlat").value.trim(), floor = $("fFloor").value.trim();
     if(name.length < 2){ err.textContent = "Please enter your full name."; return; }
-    if(digits.length < 8){ err.textContent = "Please enter a valid phone number."; return; }
+    if(local.length < 6 || (cc + local).replace(/[^0-9]/g, "").length < 8){ err.textContent = "Please enter a valid phone number."; return; }
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent = "Please enter a valid email address."; return; }
-    if(haveBlocks && b == null){ err.textContent = "Please enter your block number."; return; }
+    if(b == null){ err.textContent = "Please enter your block number."; return; }
     if(haveBlocks && fee() == null){ err.textContent = "We do not have a delivery price for block " + b + " yet. Please email " + DC.EMAIL + "."; return; }
-    if(addr.length < 5){ err.textContent = "Please enter your full delivery address."; return; }
+    if(!road){ err.textContent = "Please enter your road or street number."; return; }
+    if(!num){ err.textContent = "Please enter your " + (type === "Apartment" ? "building" : type.toLowerCase()) + " number."; return; }
+    if(type === "Apartment" && !flat){ err.textContent = "Please enter your flat number."; return; }
     if(!$("fTerms").checked){ err.textContent = "Please tick the box to accept the terms and privacy policy."; return; }
     if(!DC.sb){ err.textContent = "The store is not connected to its database yet, so orders cannot be placed."; return; }
+    var addr = type === "Apartment" ? "Building " + num + ", Flat " + flat + (floor ? ", Floor " + floor : "") + ", Road " + road : type + " " + num + ", Road " + road;
 
     var items = DC.cartLines().map(function(l){ return { product_id: l.p.id, qty: l.qty }; });
     var btn = $("placeBtn"); btn.disabled = true; btn.textContent = "Placing order…";

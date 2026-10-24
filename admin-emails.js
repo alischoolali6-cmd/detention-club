@@ -111,7 +111,9 @@
       "RULES\n1. For each block, start a new delivery in Parcel from my home to that block, read the delivery price, and write it down. This is a price check only. NEVER confirm, pay for or book a delivery. Cancel or close each quote.\n" +
       "2. Keep going until every block is done. If a block gives no price, write it down as MISSING and move on.\n" +
       "3. Collect the results as one line per block in exactly this format (block, price in BD):\n929, 1.200\n932, 1.500\n" +
-      "4. When all blocks are done, open the Detention Club admin page: " + site() + "/admin.html (I will log in for you if needed), go to the Delivery fees tab, paste your lines into the \"Import prices\" box and press Import. Then tell me how many blocks were imported and list any MISSING blocks.";
+      "4. As soon as all blocks are done, save the lines in a plain text file called block-prices.txt on my Desktop, so the data is kept.\n" +
+      "5. Then open the Detention Club admin page: " + site() + "/admin.html (I will log in for you if needed), go to the Delivery fees tab, paste the lines into the \"Import prices\" box and press Import. This puts the prices into the database, and checkout will then show each customer the delivery fee for their block.\n" +
+      "6. Finally tell me how many blocks were imported and list any MISSING blocks.";
   }
 
   window.DCEmails = { EMAIL: EMAIL, subject: subject, text: text, mailLink: mailLink, firstKind: firstKind, sampleOrder: sampleOrder, samplePre: samplePre,

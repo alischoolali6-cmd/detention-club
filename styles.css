@@ -491,3 +491,25 @@ table.t input[type=number], table.t input[type=text]{ width:100%; min-width:4.5r
 }
 .related{ padding-top:var(--space-xl); }
 .related h2{ font-size:var(--text-xl); margin-bottom:var(--space-md); }
+
+/* ---------- phone: stop iOS zooming into fields (inputs must be 16px) ---------- */
+input, select, textarea{ font-size:16px; }
+.field input, .field select, .field textarea, .search-box input, select#sortSelect{ font-size:16px; }
+
+/* ---------- cart suggestions ---------- */
+.sugg{ border-top:2px solid var(--color-ink); padding-top:var(--space-md); margin-top:var(--space-sm); }
+.sugg h3{ font-size:var(--text-md); margin-bottom:var(--space-sm); }
+.sugg__grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-sm); }
+.sugg__item{ border:2px solid var(--color-ink); border-radius:14px; padding:8px; display:grid; gap:6px; background:var(--color-paper); }
+.sugg__item img, .sugg__item .ph{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:10px; border:2px solid var(--color-ink); background:var(--color-paper-3); display:block; }
+.sugg__name{ font-weight:700; font-size:var(--text-sm); text-decoration:none; line-height:1.2; }
+.sugg__row{ display:flex; justify-content:space-between; align-items:center; gap:6px; }
+.sugg__row .price{ font-size:var(--text-sm); }
+
+/* ---------- checkout: order summary first on phones ---------- */
+@media (max-width:55rem){ .two-col > aside{ order:-1; } }
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:var(--space-sm); }
+.phone-row{ display:grid; grid-template-columns:minmax(0,9.5rem) minmax(0,1fr); gap:8px; }
+@media (max-width:30rem){ .phone-row{ grid-template-columns:minmax(0,7.5rem) minmax(0,1fr); } }
+body.pdp-loading footer{ visibility:hidden; }
+.pdp-wait{ min-height:70vh; }

@@ -42,14 +42,17 @@
 
   /* ---------- products ---------- */
   var products = [];
-  var live = false;
+  var live = false, loading = null;
+  try { var pc = JSON.parse(sessionStorage.getItem("dc_products") || "null"); if (pc && pc.length) products = pc; } catch (e) {}
   function loadProducts() {
-    if (!sb) { products = FALLBACK.slice(); live = false; return Promise.resolve(products); }
-    return sb.from("products").select("*").eq("active", true).order("sort").order("id").then(function (r) {
-      if (r.error || !r.data || !r.data.length) { products = FALLBACK.slice(); live = false; }
-      else { products = r.data; live = true; }
+    if (loading) return loading;
+    if (!sb) { products = FALLBACK.slice(); live = false; loading = Promise.resolve(products); return loading; }
+    loading = sb.from("products").select("*").eq("active", true).order("sort").order("id").then(function (r) {
+      if (r.error || !r.data || !r.data.length) { if (!products.length) products = FALLBACK.slice(); live = false; }
+      else { products = r.data; live = true; try { sessionStorage.setItem("dc_products", JSON.stringify(products)); } catch (e) {} pruneCart(); }
       return products;
-    }, function () { products = FALLBACK.slice(); live = false; return products; });
+    }, function () { if (!products.length) products = FALLBACK.slice(); live = false; return products; });
+    return loading;
   }
   function byId(id) { for (var i = 0; i < products.length; i++) if (products[i].id === Number(id)) return products[i]; return null; }
 
@@ -63,6 +66,18 @@
   function addToCart(id, n) { id = String(id); var q = cap(id, (cart[id] || 0) + (n || 1)); if (q <= 0) return false; cart[id] = q; saveCart(); return true; }
   function setQty(id, q) { id = String(id); q = cap(id, q); if (q <= 0) delete cart[id]; else cart[id] = q; saveCart(); }
   function clearCart() { cart = {}; saveCart(); }
+  function pruneCart() {
+    var changed = false;
+    Object.keys(cart).forEach(function (k) { var p = byId(k); if (!p || (p.stock <= 0 && p.allow_preorder === false)) { delete cart[k]; changed = true; } else if (p.allow_preorder === false && cart[k] > p.stock) { cart[k] = p.stock; changed = true; } });
+    if (changed) saveCart();
+  }
+  function suggest(excludeIds, n, preferCats) {
+    var ex = {}; (excludeIds || []).forEach(function (i) { ex[String(i)] = 1; });
+    var pref = {}; (preferCats || []).forEach(function (c) { pref[c] = 1; });
+    var list = products.filter(function (p) { return !ex[String(p.id)] && !(p.stock <= 0 && p.allow_preorder === false); });
+    list.sort(function (a, b) { return (pref[a.category] ? 0 : 1) - (pref[b.category] ? 0 : 1) || ((b.stock > 0) - (a.stock > 0)) || a.id - b.id; });
+    return list.slice(0, n);
+  }
   function cartLines() {
     var out = [];
     for (var k in cart) {
@@ -85,12 +100,12 @@
         '<a href="index.html" class="wordmark" aria-label="Detention Club home">DETENTION<span class="dot">•</span>CLUB</a>' +
         '<nav aria-label="Primary"><ul class="nav__links">' +
         '<li><a href="index.html">Home</a></li><li><a href="index.html#shop">Shop</a></li>' +
-        '<li><a href="track.html">Track Order</a></li><li><a href="index.html#about">About Us</a></li><li><a href="index.html#contact">Contact</a></li>' +
+        '<li><a href="track.html">Track Order</a></li><li><a href="index.html#contact">Contact</a></li>' +
         '</ul></nav>' +
         '<div class="nav__right"><button class="btn btn--sm cart-btn" id="cartBtn" aria-label="Open cart">Cart <span class="cart-count" id="cartCount" data-n="0">0</span></button>' +
         '<button class="hamburger" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu"><span></span></button></div>' +
         '</div><nav id="mobileMenu" class="wrap" aria-label="Mobile">' +
-        '<a href="index.html">Home</a><a href="index.html#shop">Shop</a><a href="track.html">Track Order</a><a href="index.html#about">About Us</a><a href="index.html#contact">Contact</a>' +
+        '<a href="index.html">Home</a><a href="index.html#shop">Shop</a><a href="track.html">Track Order</a><a href="index.html#contact">Contact</a>' +
         '</nav></header></div>';
     }
     var foot = document.getElementById("chrome-footer");
@@ -101,7 +116,6 @@
         '<p style="font-family:var(--font-display);font-weight:800;margin-top:var(--space-sm);">DETENTION CLUB</p>' +
         '<div class="foot-meta"><a href="index.html#shop">Shop</a><a href="track.html">Track your order</a><a href="terms.html">Terms &amp; Privacy</a>' +
         '<a href="mailto:' + EMAIL + '">' + EMAIL + '</a><a href="admin.html">Admin</a><span>Cash on delivery</span></div>' +
-        '<p class="foot-copy">Created by ALI.Y, DANNY &amp; ABR. A student-run business in Bahrain.</p>' +
         '</div></footer>';
     }
     if (!sb) {
@@ -121,6 +135,8 @@
 
     var hb = document.getElementById("hamburgerBtn"), mm = document.getElementById("mobileMenu");
     if (hb) hb.addEventListener("click", function () { var o = mm.classList.toggle("open"); hb.setAttribute("aria-expanded", o ? "true" : "false"); });
+    if (mm) mm.addEventListener("click", function (e) { if (e.target.closest("a")) { mm.classList.remove("open"); if (hb) hb.setAttribute("aria-expanded", "false"); } });
+    window.addEventListener("hashchange", function () { if (mm) mm.classList.remove("open"); if (hb) hb.setAttribute("aria-expanded", "false"); });
     document.getElementById("cartBtn").addEventListener("click", openDrawer);
     document.getElementById("drawerClose").addEventListener("click", closeDrawer);
     document.getElementById("drawerScrim").addEventListener("click", closeDrawer);
@@ -130,10 +146,15 @@
       var id = b.getAttribute("data-id"), cur = cart[id] || 0, a = b.getAttribute("data-act");
       if (a === "inc") setQty(id, cur + 1); else if (a === "dec") setQty(id, cur - 1); else if (a === "rm") setQty(id, 0);
     });
+    document.getElementById("drawerBody").addEventListener("click", function (e) {
+      var a = e.target.closest("[data-sadd]"); if (!a) return;
+      addToCart(a.getAttribute("data-sadd"));
+    });
     listeners.push(renderDrawer);
     renderDrawer();
+    loadProducts().then(renderDrawer);
   }
-  function openDrawer() { document.getElementById("drawer").classList.add("open"); document.getElementById("drawerScrim").classList.add("open"); document.getElementById("drawer").setAttribute("aria-hidden", "false"); }
+  function openDrawer() { loadProducts().then(renderDrawer); document.getElementById("drawer").classList.add("open"); document.getElementById("drawerScrim").classList.add("open"); document.getElementById("drawer").setAttribute("aria-hidden", "false"); }
   function closeDrawer() { var d = document.getElementById("drawer"); if (!d) return; d.classList.remove("open"); document.getElementById("drawerScrim").classList.remove("open"); d.setAttribute("aria-hidden", "true"); }
   function renderDrawer() {
     var n = cartCount(), c = document.getElementById("cartCount");
@@ -141,8 +162,14 @@
     var body = document.getElementById("drawerBody"), foot = document.getElementById("drawerFoot");
     if (!body) return;
     var lines = cartLines();
+    var inCart = lines.map(function (l) { return l.p.id; });
+    var sugg = suggest(inCart, 4, lines.map(function (l) { return l.p.category; }));
+    var suggHtml = sugg.length ? '<div class="sugg"><h3>You may like</h3><div class="sugg__grid">' + sugg.map(function (p) {
+      var img = p.image ? '<img src="' + esc(p.image) + '" alt="" loading="lazy">' : '<div class="ph"></div>';
+      return '<div class="sugg__item"><a href="product.html?id=' + p.id + '#' + p.id + '">' + img + '</a><a class="sugg__name" href="product.html?id=' + p.id + '#' + p.id + '">' + esc(p.name) + '</a><div class="sugg__row"><span class="price">' + money(p.price_fils) + '</span><button class="card__add" data-sadd="' + p.id + '">Add</button></div></div>';
+    }).join("") + '</div></div>' : '';
     if (!lines.length) {
-      body.innerHTML = '<p class="muted">Your cart is empty. Pick something fun from the shop.</p>';
+      body.innerHTML = '<p class="muted">Your cart is empty. Pick something fun below or from the shop.</p>' + suggHtml;
       foot.innerHTML = '<a class="btn btn--block" href="index.html#shop">Browse the shop</a>';
       return;
     }
@@ -152,10 +179,10 @@
         '<div class="qty"><button data-act="dec" data-id="' + l.p.id + '" aria-label="Fewer">−</button><span>' + l.qty + '</span><button data-act="inc" data-id="' + l.p.id + '" aria-label="More">+</button></div>' +
         (l.pre ? '<div class="stock-note pre">' + l.pre + ' not available in Bahrain · ships from abroad, +' + PREORDER_DAYS + ' days</div>' : '') + '</div>' +
         '<div style="text-align:right"><span class="price">' + money(l.total) + '</span><br><button class="link-btn" data-act="rm" data-id="' + l.p.id + '">Remove</button></div></div>';
-    }).join("");
+    }).join("") + suggHtml;
     var hasPre = lines.some(function (l) { return l.pre > 0; });
     foot.innerHTML = '<div class="total-row"><span>Items</span><span class="price">' + money(cartSubtotal()) + '</span></div>' +
-      '<p class="stock-note">Delivery fee is added at checkout by area. Pay cash on delivery.</p>' +
+      '<p class="stock-note">Delivery fee is added at checkout by your block. Pay cash on delivery.</p>' +
       (hasPre ? '<p class="notice blue">Some items are not available in Bahrain. They are shipped from abroad, which delays delivery by ' + PREORDER_DAYS + ' days.</p>' : '') +
       '<a class="btn btn--block" href="checkout.html">Checkout</a>';
   }
@@ -180,7 +207,7 @@
     cfg: cfg, sb: sb, EMAIL: EMAIL, PREORDER_DAYS: PREORDER_DAYS, CATS: CATS,
     esc: esc, money: money, moneyFull: moneyFull,
     loadProducts: loadProducts, byId: byId, isLive: function () { return live; }, products: function () { return products; },
-    cart: cart, addToCart: addToCart, setQty: setQty, clearCart: clearCart, cartLines: cartLines, cartSubtotal: cartSubtotal, cartCount: cartCount,
+    cart: cart, addToCart: addToCart, setQty: setQty, clearCart: clearCart, cartLines: cartLines, cartSubtotal: cartSubtotal, cartCount: cartCount, suggest: suggest,
     openDrawer: openDrawer, mountChrome: mountChrome, onCart: function (f) { listeners.push(f); }, logView: logView
   };
 })();

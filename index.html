@@ -24,7 +24,7 @@
         <a href="track.html" class="btn btn--ghost">Track My Order</a>
       </div>
       <div class="hero__badges">
-        <div class="badge-tile"><b id="minPrice">—</b><span>Prices start at</span></div>
+        <div class="badge-tile"><b>500 fils</b><span>Prices start at</span></div>
         <div class="badge-tile"><b>Cash</b><span>Pay on delivery</span></div>
         <div class="badge-tile"><b>Track</b><span>Every order live</span></div>
       </div>
@@ -84,18 +84,6 @@
   <section id="reviews" aria-label="Customer reviews" hidden>
     <div class="sect-head"><h2>What customers say</h2><p>Real reviews from people who received their orders.</p></div>
     <div class="reviews" id="reviewList"></div>
-  </section>
-
-  <section id="about" aria-label="About us">
-    <div class="sect-head">
-      <h2>THE THREE BEHIND THE BUSINESS</h2>
-      <p>Three Year 10 students. One colorful idea. Detention Club brings together fun toys, unexpected finds, and a little school-day mischief.</p>
-    </div>
-    <div class="owners">
-      <div class="owner-card"><div class="avatar" style="background:var(--color-lime); color:var(--color-ink);">DN</div><h3>DANNY</h3><p>Co-Founder, Detention Club</p></div>
-      <div class="owner-card owner-card--lead"><span class="rank-pill">Founder</span><div class="avatar" style="background:var(--color-orange); color:var(--color-orange-ink);">AY</div><h3>ALI.Y</h3><p>Founder, Detention Club</p></div>
-      <div class="owner-card"><div class="avatar" style="background:var(--color-blue); color:var(--color-paper);">AB</div><h3>ABR</h3><p>Co-Founder, Detention Club</p></div>
-    </div>
   </section>
 
   <section id="contact" aria-label="Contact">
@@ -170,7 +158,7 @@
         '<div class="card__media" style="--cat-color:'+c.color+'">'+badge(p)+media(p,true)+'</div>'+
         '<div class="card__body">'+
           '<span class="card__cat">'+DC.esc(c.label)+'</span>'+
-          '<h3 class="card__name"><a class="card__link" href="product.html?id='+p.id+'">'+DC.esc(p.name)+'</a></h3>'+
+          '<h3 class="card__name"><a class="card__link" href="product.html?id='+p.id+'#'+p.id+'">'+DC.esc(p.name)+'</a></h3>'+
           '<p class="card__desc">'+DC.esc(p.description)+'</p>'+
           '<span class="stock-note'+(p.stock>0?'':' pre')+'">'+availText(p)+'</span>'+
           '<div class="card__foot"><span class="price">'+DC.money(p.price_fils)+'</span>'+
@@ -195,8 +183,6 @@
 
   DC.loadProducts().then(function(list){
     buildTabs(); render();
-    var min = list.reduce(function(m,p){ return Math.min(m,p.price_fils); }, Infinity);
-    document.getElementById("minPrice").textContent = isFinite(min) ? DC.money(min) : "—";
   });
 
   // approved reviews (hidden until there is at least one)
