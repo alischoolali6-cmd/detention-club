@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Item — Detention Club</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="chrome-header"></div>
+
+<main class="wrap">
+  <p class="crumbs"><a href="index.html">Home</a> / <a href="index.html#shop">Shop</a> / <span id="crumbName">Item</span></p>
+
+  <section class="pdp" id="pdp" hidden style="padding-block:var(--space-xl) var(--space-2xl)">
+    <div class="pdp__media" id="pdpMedia"></div>
+    <div class="pdp__info">
+      <span class="card__cat" id="pdpCat"></span>
+      <h1 id="pdpName"></h1>
+      <div class="pdp__price" id="pdpPrice"></div>
+      <p id="pdpAvail" class="notice" style="margin:0"></p>
+      <p id="pdpDesc" style="color:var(--color-ink-2);font-size:var(--text-md);max-width:52ch"></p>
+      <div class="pdp__qty pdp__main-add"><div class="qty"><button type="button" id="qMinus" aria-label="Fewer">−</button><span id="qVal">1</span><button type="button" id="qPlus" aria-label="More">+</button></div></div>
+      <div class="actions pdp__main-add"><button class="btn" id="addBtn">Add to cart</button><a class="btn btn--ghost" href="checkout.html">Checkout</a></div>
+      <p class="stock-note">Pay cash on delivery. Orders are usually delivered within 1 to 2 days.</p>
+    </div>
+  </section>
+
+  <section id="notFound" hidden class="page" style="padding-block:var(--space-2xl)">
+    <h1>We could not find that item</h1>
+    <p style="margin-top:var(--space-md)"><a class="btn" href="index.html#shop">Back to the shop</a></p>
+  </section>
+
+  <section class="related" id="related" hidden style="padding-block:var(--space-xl) var(--space-2xl)">
+    <h2>More like this</h2>
+    <div class="grid" id="relatedGrid"></div>
+  </section>
+</main>
+
+<div class="pdp__bar" id="pdpBar" hidden>
+  <div><div class="pdp__price" id="barPrice" style="font-size:var(--text-lg)"></div><div class="stock-note" id="barNote"></div></div>
+  <button class="btn" id="barAdd">Add to cart</button>
+</div>
+
+<div id="chrome-footer"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="shop.js"></script>
+<script>
+(function(){
+  "use strict";
+  DC.mountChrome();
+  DC.logView();
+  var $ = function(id){ return document.getElementById(id); };
+  var ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="80" height="80"><circle cx="7" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><circle cx="7" cy="17" r="3"/><circle cx="17" cy="17" r="3"/></svg>';
+  var toastT, qty = 1, product = null;
+  function toast(m){ var t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function(){ t.hidden = true; }, 2200); }
+
+  function avail(p){
+    if(DC.soldOut(p)) return "Sold out";
+    return p.stock > 0 ? "In stock" : DC.ABROAD;
+  }
+  function btnText(p){ return DC.soldOut(p) ? "Sold out" : p.stock > 0 ? "Add to cart" : "Pre-order (+" + DC.PREORDER_DAYS + " days)"; }
+
+  function show(p){
+    product = p;
+    var c = DC.CATS[p.category] || { label: p.category, color: "var(--color-paper-3)" };
+    document.title = p.name + " — Detention Club";
+    $("crumbName").textContent = p.name;
+    $("pdpMedia").style.setProperty("--cat-color", c.color);
+    $("pdpMedia").innerHTML = p.image ? '<img src="' + DC.esc(p.image) + '" alt="' + DC.esc(p.name) + '" fetchpriority="high">' : '<div style="text-align:center">' + ICON + '<div class="card__placeholder-label" style="display:inline-block;margin-top:8px">Photo coming soon</div></div>';
+    $("pdpCat").textContent = c.label;
+    $("pdpName").textContent = p.name;
+    $("pdpPrice").textContent = DC.money(p.price_fils);
+    var a = $("pdpAvail"); a.textContent = avail(p); a.className = "notice" + (p.stock > 0 && !DC.soldOut(p) ? " blue" : "");
+    $("pdpDesc").textContent = p.description || "";
+    var dis = DC.soldOut(p);
+    [$("addBtn"), $("barAdd")].forEach(function(b){ b.disabled = dis; b.textContent = btnText(p); });
+    $("barPrice").textContent = DC.money(p.price_fils); $("barNote").textContent = p.stock > 0 ? "In stock" : dis ? "Sold out" : "+" + DC.PREORDER_DAYS + " days";
+    $("pdp").hidden = false; $("pdpBar").hidden = false; document.body.classList.add("has-pdp-bar");
+
+    var rel = DC.products().filter(function(x){ return x.category === p.category && x.id !== p.id; }).slice(0, 4);
+    if(rel.length){
+      $("related").hidden = false;
+      $("relatedGrid").innerHTML = rel.map(function(x){
+        var cc = DC.CATS[x.category] || { color: "var(--color-paper-3)" };
+        return '<article class="card"><div class="card__media" style="--cat-color:' + cc.color + '">' + (x.image ? '<img src="' + DC.esc(x.image) + '" alt="' + DC.esc(x.name) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover">' : '') + '</div>' +
+          '<div class="card__body"><h3 class="card__name"><a class="card__link" href="product.html?id=' + x.id + '">' + DC.esc(x.name) + '</a></h3><div class="card__foot"><span class="price">' + DC.money(x.price_fils) + '</span></div></div></article>';
+      }).join("");
+    }
+  }
+
+  function add(){
+    if(!product) return;
+    var ok = true; for(var i = 0; i < qty; i++){ ok = DC.addToCart(product.id) && ok; }
+    toast(ok ? (qty > 1 ? qty + " added to cart" : "Added to cart") : "No more in stock");
+    DC.openDrawer();
+  }
+  $("addBtn").addEventListener("click", add); $("barAdd").addEventListener("click", add);
+  $("qMinus").addEventListener("click", function(){ qty = Math.max(1, qty - 1); $("qVal").textContent = qty; });
+  $("qPlus").addEventListener("click", function(){ qty = Math.min(20, qty + 1); $("qVal").textContent = qty; });
+
+  var id = Number(new URLSearchParams(location.search).get("id"));
+  DC.loadProducts().then(function(){
+    var p = DC.byId(id);
+    if(p) show(p); else $("notFound").hidden = false;
+  });
+})();
+</script>
+</body>
+</html>

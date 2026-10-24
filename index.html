@@ -110,16 +110,7 @@
 
 <div id="chrome-footer"></div>
 
-<dialog id="productDialog" aria-labelledby="dlgName">
-  <button class="dlg__close" id="dlgClose" aria-label="Close">×</button>
-  <div class="dlg__media" id="dlgMedia"></div>
-  <div class="dlg__body">
-    <div class="dlg__row"><h3 id="dlgName"></h3><span class="price" id="dlgPrice"></span></div>
-    <div class="dlg__meta"><span class="pill" id="dlgCat"></span><span class="pill" id="dlgAvail"></span></div>
-    <p id="dlgDesc" style="color:var(--color-ink-2);"></p>
-    <button class="btn" style="margin-top:var(--space-md);" id="dlgAdd">Add to cart</button>
-  </div>
-</dialog>
+
 
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -179,37 +170,19 @@
         '<div class="card__media" style="--cat-color:'+c.color+'">'+badge(p)+media(p,true)+'</div>'+
         '<div class="card__body">'+
           '<span class="card__cat">'+DC.esc(c.label)+'</span>'+
-          '<h3 class="card__name">'+DC.esc(p.name)+'</h3>'+
+          '<h3 class="card__name"><a class="card__link" href="product.html?id='+p.id+'">'+DC.esc(p.name)+'</a></h3>'+
           '<p class="card__desc">'+DC.esc(p.description)+'</p>'+
           '<span class="stock-note'+(p.stock>0?'':' pre')+'">'+availText(p)+'</span>'+
           '<div class="card__foot"><span class="price">'+DC.money(p.price_fils)+'</span>'+
-          '<span class="card__actions"><button class="card__view" data-view="'+p.id+'">Details</button>'+
-          '<button class="card__add" data-add="'+p.id+'"'+(DC.soldOut(p)?' disabled':'')+'>'+(DC.soldOut(p)?'Sold out':p.stock>0?'Add':'Pre-order')+'</button></span></div>'+
+          '<button class="card__add" data-add="'+p.id+'"'+(DC.soldOut(p)?' disabled':'')+'>'+(DC.soldOut(p)?'Sold out':p.stock>0?'Add':'Pre-order')+'</button></div>'+
         '</div></article>';
     }).join("");
   }
 
-  var dlg = document.getElementById("productDialog"), dlgId = null;
   grid.addEventListener("click", function(e){
-    var add = e.target.closest("[data-add]"), view = e.target.closest("[data-view]");
-    if(add){ toast(DC.addToCart(add.getAttribute("data-add")) ? "Added to cart" : "No more in stock"); return; }
-    if(view){
-      var p = DC.byId(view.getAttribute("data-view")); if(!p) return;
-      dlgId = p.id;
-      var c = DC.CATS[p.category] || {label:p.category, color:"var(--color-paper-3)"};
-      var m = document.getElementById("dlgMedia"); m.style.setProperty("--cat-color", c.color); m.innerHTML = media(p,false);
-      document.getElementById("dlgName").textContent = p.name;
-      document.getElementById("dlgPrice").textContent = DC.money(p.price_fils);
-      document.getElementById("dlgCat").textContent = c.label;
-      document.getElementById("dlgAvail").textContent = availText(p);
-      document.getElementById("dlgDesc").textContent = p.description;
-      var da = document.getElementById("dlgAdd"); da.disabled = DC.soldOut(p); da.textContent = DC.soldOut(p) ? "Sold out" : p.stock > 0 ? "Add to cart" : "Pre-order (+"+DC.PREORDER_DAYS+" days)";
-      dlg.showModal();
-    }
+    var add = e.target.closest("[data-add]");
+    if(add){ e.preventDefault(); toast(DC.addToCart(add.getAttribute("data-add")) ? "Added to cart" : "No more in stock"); }
   });
-  document.getElementById("dlgAdd").addEventListener("click", function(){ if(dlgId){ toast(DC.addToCart(dlgId) ? "Added to cart" : "No more in stock"); dlg.close(); } });
-  document.getElementById("dlgClose").addEventListener("click", function(){ dlg.close(); });
-  dlg.addEventListener("click", function(e){ if(e.target === dlg) dlg.close(); });
 
   tabsEl.addEventListener("click", function(e){
     var b = e.target.closest(".tab"); if(!b) return;
