@@ -11,29 +11,28 @@
   var ABROAD = "Not available in Bahrain. Shipped from abroad, which delays delivery by " + PREORDER_DAYS + " days.";
 
   var CATS = {
-    fidget:   { label: "Fidget & Stretch",    color: "var(--color-lime)" },
-    squish:   { label: "Squish Zone",         color: "var(--color-pink)" },
-    style:    { label: "Style & Accessories", color: "var(--color-orange)" },
-    useful:   { label: "Cool & Useful",       color: "var(--color-blue)" },
-    creative: { label: "Creative & Novelty",  color: "var(--color-yellow)" },
-    special:  { label: "Special Finds",       color: "var(--color-paper-3)" }
+    squish: { label: "Squishies",  color: "var(--color-pink)" },
+    fun:    { label: "Fun Stuff",  color: "var(--color-lime)" }
   };
+
 
   // Shown only if Supabase is not connected yet (preview mode).
   var FALLBACK = [
-    { id: 1, name: "Stretchy Toy", category: "fidget", price_fils: 300, allow_preorder: true, stock: 24, description: "Stretch it, twist it, snap it back — endlessly fidget-friendly.", image: "images/stretchy-toy.jpeg" },
-    { id: 2, name: "Fashionable Glasses", category: "style", price_fils: 500, allow_preorder: true, stock: 30, description: "Bold, oversized frames that turn any outfit into a look.", image: "images/fashionable-glasses.jpeg" },
-    { id: 3, name: "Cheer Megaphones", category: "style", price_fils: 500, allow_preorder: true, stock: 4, description: "Get loud and proud — perfect for cheering on your favorites.", image: "images/cheer-megaphones.jpeg" },
-    { id: 4, name: "Fidget Pop-Ups", category: "fidget", price_fils: 300, allow_preorder: true, stock: 50, description: "The click-and-pop favorite, restocked and ready for recess.", image: "images/fidget-pop-ups.jpeg" },
-    { id: 5, name: "Banana Squishies", category: "squish", price_fils: 700, allow_preorder: true, stock: 10, description: "Slow-rise banana squishies, soft and satisfying to squeeze.", image: "images/banana-squishies.jpeg" },
-    { id: 6, name: "3D-Printed Gradient Items", category: "creative", price_fils: 500, allow_preorder: true, stock: 10, description: "Small printed shapes with a smooth color-gradient finish, one-of-a-kind desk decor.", image: "images/3d-printed-gradient-items.jpeg" },
-    { id: 7, name: "Small Keychains", category: "style", price_fils: 200, allow_preorder: true, stock: 50, description: "Clip-on keychains to decorate your bag or keys.", image: "images/small-keychains.jpeg" },
-    { id: 8, name: "Silicone Cup Phone Holders", category: "useful", price_fils: 500, allow_preorder: true, stock: 50, description: "A soft silicone cup stand that keeps your phone propped up and steady.", image: "images/silicone-cup-phone-holders.jpeg" },
-    { id: 9, name: "Mini Colorful Rings", category: "style", price_fils: 300, allow_preorder: true, stock: 48, description: "Tiny stackable rings in a rainbow of colors.", image: "images/mini-colorful-rings.jpeg" },
-    { id: 10, name: "Watermelon Squishies", category: "squish", price_fils: 500, allow_preorder: true, stock: 30, description: "Slow-rise watermelon slices, soft and satisfying to squeeze.", image: "images/watermelon-squishies.jpeg" },
-    { id: 11, name: "Payment Star", category: "special", price_fils: 2000, allow_preorder: true, stock: 2, description: "A rare special find — grab one before it is gone.", image: "images/payment-star.jpeg" },
-    { id: 12, name: "Invisible Pens", category: "useful", price_fils: 500, allow_preorder: true, stock: 20, description: "Write a secret message that only shows up under UV light.", image: "images/invisible-pens.jpeg" }
+    { id: 1, name: "Mini Cube Squishy", category: "squish", price_fils: 500, allow_preorder: true, stock: 36, description: "Little jelly ice-cube squishy in a random colour. Squeeze it, throw it, collect them all.", image: "images/mini-cube-squishy.jpg" },
+    { id: 2, name: "Yellow Cheese Squishy", category: "squish", price_fils: 1000, allow_preorder: true, stock: 36, description: "Chunky cheese-block squishy that slowly rises back after every squeeze.", image: "images/yellow-cheese-squishy.jpg" },
+    { id: 3, name: "Watermelon Squishy", category: "squish", price_fils: 1000, allow_preorder: true, stock: 36, description: "Juicy watermelon-slice squishy, soft and slow-rising. Style is random.", image: "images/watermelon-squishy.jpg" },
+    { id: 4, name: "Banana Squishy", category: "squish", price_fils: 1000, allow_preorder: true, stock: 36, description: "Realistic banana squishy, super soft. Style is random.", image: "images/banana-squishy.jpg" },
+    { id: 5, name: "Butter Squishy", category: "squish", price_fils: 1500, allow_preorder: true, stock: 36, description: "Realistic butter-stick squishy, the satisfying one everyone wants to squeeze.", image: "images/butter-squishy.jpg" },
+    { id: 6, name: "Carrot Squishy", category: "squish", price_fils: 2000, allow_preorder: true, stock: 36, description: "Big, ultra-soft carrot squishy.", image: "images/carrot-squishy.jpg" },
+    { id: 7, name: "Peanut Squishy", category: "squish", price_fils: 2000, allow_preorder: true, stock: 36, description: "Giant peanut squishy with a soft, bumpy shell texture.", image: "images/peanut-squishy.jpg" },
+    { id: 8, name: "Chocolate Squishy", category: "squish", price_fils: 2000, allow_preorder: true, stock: 36, description: "Chocolate-bar squishy that bends, squeezes and slowly rises back.", image: "images/chocolate-squishy.jpg" },
+    { id: 9, name: "3D Printed Gradient Spinner", category: "fun", price_fils: 500, allow_preorder: true, stock: 36, description: "3D-printed spinning top with a gradient colour swirl. Colour is random.", image: "images/3d-printed-gradient-spinner.jpg" },
+    { id: 10, name: "Silicone Phone Cup", category: "fun", price_fils: 500, allow_preorder: true, stock: 36, description: "Silicone suction-cup grip that sticks to the back of your phone. Colour is random.", image: "images/silicone-phone-cup.jpg" },
+    { id: 11, name: "Cheer Megaphone", category: "fun", price_fils: 1000, allow_preorder: true, stock: 36, description: "Loud, colourful cheer horn for matches, Sports Day and celebrations.", image: "images/cheer-megaphone.jpg" },
+    { id: 12, name: "Trend Glasses", category: "fun", price_fils: 1000, allow_preorder: true, stock: 36, description: "Pixel-style party glasses. Colour is random.", image: "images/trend-glasses.jpg" },
+    { id: 13, name: "Teacher Stick", category: "fun", price_fils: 1000, allow_preorder: true, stock: 36, description: "Extendable pointer stick with a pointing-hand top. Colour is random.", image: "images/teacher-stick.jpg" }
   ];
+
 
   var sb = null;
   if (cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase) {

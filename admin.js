@@ -27,7 +27,7 @@
 
   var STATUS = { received: "New", preparing: "Confirmed", ready: "Confirmed for delivery", out_for_delivery: "Out for delivery", delivered: "Delivered", cancelled: "Cancelled" };
   var NEXT = { received: ["preparing", "Confirm order"], preparing: ["ready", "Confirm for delivery"], ready: ["out_for_delivery", "Mark out for delivery"], out_for_delivery: ["delivered", "Mark delivered"] };
-  var CATS = { fidget: "Fidget & Stretch", squish: "Squish Zone", style: "Style & Accessories", useful: "Cool & Useful", creative: "Creative & Novelty", special: "Special Finds" };
+  var CATS = { squish: "Squishies", fun: "Fun Stuff" };
   A.CATS = CATS;
   var FILTERS = [["active", "Active"], ["received", "New"], ["pre", "Pre-orders"], ["preparing", "Confirmed"], ["ready", "For delivery"], ["out_for_delivery", "Out for delivery"], ["delivered", "Delivered"], ["cancelled", "Cancelled"], ["all", "All"]];
   var TABS = ["orders", "money", "restock", "stock", "promos", "zones", "reviews", "visitors", "data"];
