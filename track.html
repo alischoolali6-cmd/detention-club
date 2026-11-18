@@ -67,6 +67,7 @@
 <script>
 (function(){
   "use strict";
+  if(DC.EVENT){ location.replace("index.html#event"); return; }
   DC.mountChrome();
   DC.logView();
   var $ = function(id){ return document.getElementById(id); };

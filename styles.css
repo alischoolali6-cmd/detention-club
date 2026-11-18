@@ -159,7 +159,7 @@ button{ font-family:inherit; }
 
 @media (max-width:60rem){
   .hero{ grid-template-columns:1fr; }
-  .hero__art{ order:-1; max-width:min(80vw,320px); margin-inline:auto; }
+  .hero__art{ order:-1; width:min(80vw,320px); max-width:min(80vw,320px); margin-inline:auto; }
   .hero__badges{ grid-template-columns:1fr; }
 }
 
@@ -513,3 +513,12 @@ input, select, textarea{ font-size:16px; }
 @media (max-width:30rem){ .phone-row{ grid-template-columns:minmax(0,7.5rem) minmax(0,1fr); } }
 body.pdp-loading footer{ visibility:hidden; }
 .pdp-wait{ min-height:70vh; }
+
+/* ---------- site mode: event or store ---------- */
+html[data-mode="event"] [data-only="store"]{ display:none !important; }
+html:not([data-mode="event"]) [data-only="event"]{ display:none !important; }
+.btn--ig{ background:linear-gradient(135deg,var(--color-pink),var(--color-orange)); color:var(--color-orange-ink); }
+.ig-strip{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-lg); flex-wrap:wrap; border:var(--border-w) solid var(--color-ink); border-radius:var(--radius-card); padding:var(--space-lg); background:var(--color-yellow); box-shadow:var(--shadow-sticker); }
+.ig-strip h2{ font-size:var(--text-xl); }
+.ig-strip p{ margin-top:4px; font-weight:700; }
+.event-where{ font-weight:800; font-size:var(--text-md); }

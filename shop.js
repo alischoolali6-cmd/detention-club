@@ -3,6 +3,10 @@
   "use strict";
   var cfg = window.DC_CONFIG || {};
   var EMAIL = "detentionclub0@gmail.com";
+  var MODE = cfg.mode === "event" ? "event" : "store";
+  var EVENT = MODE === "event";
+  var INSTAGRAM = "https://www.instagram.com/detention_club67/";
+  var IG_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>';
   var PREORDER_DAYS = "8-10";
   var ABROAD = "Not available in Bahrain. Shipped from abroad, which delays delivery by " + PREORDER_DAYS + " days.";
 
@@ -95,18 +99,22 @@
   function mountChrome(active) {
     var base = document.getElementById("chrome-header");
     if (base) {
+      var links = EVENT
+        ? '<li><a href="index.html">Home</a></li><li><a href="index.html#event">Event</a></li><li><a href="index.html#shop">Our Toys</a></li><li><a href="index.html#contact">Contact</a></li>'
+        : '<li><a href="index.html">Home</a></li><li><a href="index.html#shop">Shop</a></li><li><a href="track.html">Track Order</a></li><li><a href="index.html#contact">Contact</a></li>';
+      var mlinks = EVENT
+        ? '<a href="index.html">Home</a><a href="index.html#event">Event</a><a href="index.html#shop">Our Toys</a><a href="index.html#contact">Contact</a><a href="' + INSTAGRAM + '" target="_blank" rel="noopener">Instagram</a>'
+        : '<a href="index.html">Home</a><a href="index.html#shop">Shop</a><a href="track.html">Track Order</a><a href="index.html#contact">Contact</a><a href="' + INSTAGRAM + '" target="_blank" rel="noopener">Instagram</a>';
+      var right = EVENT
+        ? '<a class="btn btn--sm" href="' + INSTAGRAM + '" target="_blank" rel="noopener">' + IG_ICON + ' Follow us</a>'
+        : '<button class="btn btn--sm cart-btn" id="cartBtn" aria-label="Open cart">Cart <span class="cart-count" id="cartCount" data-n="0">0</span></button>';
       base.outerHTML =
         '<div class="site-header"><header class="nav"><div class="wrap nav__inner">' +
         '<a href="index.html" class="wordmark" aria-label="Detention Club home">DETENTION<span class="dot">•</span>CLUB</a>' +
-        '<nav aria-label="Primary"><ul class="nav__links">' +
-        '<li><a href="index.html">Home</a></li><li><a href="index.html#shop">Shop</a></li>' +
-        '<li><a href="track.html">Track Order</a></li><li><a href="index.html#contact">Contact</a></li>' +
-        '</ul></nav>' +
-        '<div class="nav__right"><button class="btn btn--sm cart-btn" id="cartBtn" aria-label="Open cart">Cart <span class="cart-count" id="cartCount" data-n="0">0</span></button>' +
+        '<nav aria-label="Primary"><ul class="nav__links">' + links + '</ul></nav>' +
+        '<div class="nav__right">' + right +
         '<button class="hamburger" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu"><span></span></button></div>' +
-        '</div><nav id="mobileMenu" class="wrap" aria-label="Mobile">' +
-        '<a href="index.html">Home</a><a href="index.html#shop">Shop</a><a href="track.html">Track Order</a><a href="index.html#contact">Contact</a>' +
-        '</nav></header></div>';
+        '</div><nav id="mobileMenu" class="wrap" aria-label="Mobile">' + mlinks + '</nav></header></div>';
     }
     var foot = document.getElementById("chrome-footer");
     if (foot) {
@@ -114,10 +122,20 @@
         '<footer><div class="wrap">' +
         '<p class="foot-statement">SQUISH <span class="hl">•</span> STRETCH <span class="hl">•</span> POP <span class="hl">•</span> PLAY</p>' +
         '<p style="font-family:var(--font-display);font-weight:800;margin-top:var(--space-sm);">DETENTION CLUB</p>' +
-        '<div class="foot-meta"><a href="index.html#shop">Shop</a><a href="track.html">Track your order</a><a href="terms.html">Terms &amp; Privacy</a>' +
-        '<a href="mailto:' + EMAIL + '">' + EMAIL + '</a><a href="admin.html">Admin</a><span>Cash on delivery</span></div>' +
+        '<div class="foot-meta">' + (EVENT
+          ? '<a href="index.html#event">Event</a><a href="index.html#shop">Our toys</a>'
+          : '<a href="index.html#shop">Shop</a><a href="track.html">Track your order</a><a href="terms.html">Terms &amp; Privacy</a>') +
+        '<a href="' + INSTAGRAM + '" target="_blank" rel="noopener">Instagram @detention_club67</a>' +
+        '<a href="mailto:' + EMAIL + '">' + EMAIL + '</a><a href="admin.html">Admin</a>' +
+        '<span>' + (EVENT ? 'Quest School · 15 December 2026' : 'Cash on delivery') + '</span></div>' +
         '</div></footer>';
     }
+    var hb = document.getElementById("hamburgerBtn"), mm = document.getElementById("mobileMenu");
+    if (hb) hb.addEventListener("click", function () { var o = mm.classList.toggle("open"); hb.setAttribute("aria-expanded", o ? "true" : "false"); });
+    if (mm) mm.addEventListener("click", function (e) { if (e.target.closest("a")) { mm.classList.remove("open"); if (hb) hb.setAttribute("aria-expanded", "false"); } });
+    window.addEventListener("hashchange", function () { if (mm) mm.classList.remove("open"); if (hb) hb.setAttribute("aria-expanded", "false"); });
+    if (EVENT) return;   // the cart only exists in store mode
+
     if (!sb) {
       var bar = document.createElement("div");
       bar.className = "notice";
@@ -132,11 +150,6 @@
       '<div class="drawer__head"><h2>Your cart</h2><button class="icon-btn" id="drawerClose" aria-label="Close cart">×</button></div>' +
       '<div class="drawer__body" id="drawerBody"></div><div class="drawer__foot" id="drawerFoot"></div></aside>';
     document.body.appendChild(d);
-
-    var hb = document.getElementById("hamburgerBtn"), mm = document.getElementById("mobileMenu");
-    if (hb) hb.addEventListener("click", function () { var o = mm.classList.toggle("open"); hb.setAttribute("aria-expanded", o ? "true" : "false"); });
-    if (mm) mm.addEventListener("click", function (e) { if (e.target.closest("a")) { mm.classList.remove("open"); if (hb) hb.setAttribute("aria-expanded", "false"); } });
-    window.addEventListener("hashchange", function () { if (mm) mm.classList.remove("open"); if (hb) hb.setAttribute("aria-expanded", "false"); });
     document.getElementById("cartBtn").addEventListener("click", openDrawer);
     document.getElementById("drawerClose").addEventListener("click", closeDrawer);
     document.getElementById("drawerScrim").addEventListener("click", closeDrawer);
@@ -154,7 +167,7 @@
     renderDrawer();
     loadProducts().then(renderDrawer);
   }
-  function openDrawer() { loadProducts().then(renderDrawer); document.getElementById("drawer").classList.add("open"); document.getElementById("drawerScrim").classList.add("open"); document.getElementById("drawer").setAttribute("aria-hidden", "false"); }
+  function openDrawer() { if (!document.getElementById("drawer")) return; loadProducts().then(renderDrawer); document.getElementById("drawer").classList.add("open"); document.getElementById("drawerScrim").classList.add("open"); document.getElementById("drawer").setAttribute("aria-hidden", "false"); }
   function closeDrawer() { var d = document.getElementById("drawer"); if (!d) return; d.classList.remove("open"); document.getElementById("drawerScrim").classList.remove("open"); d.setAttribute("aria-hidden", "true"); }
   function renderDrawer() {
     var n = cartCount(), c = document.getElementById("cartCount");
@@ -203,7 +216,7 @@
   }
 
   window.DC = {
-    ABROAD: ABROAD, soldOut: function (p) { return p.stock <= 0 && p.allow_preorder === false; },
+    MODE: MODE, EVENT: EVENT, INSTAGRAM: INSTAGRAM, IG_ICON: IG_ICON, ABROAD: ABROAD, soldOut: function (p) { return p.stock <= 0 && p.allow_preorder === false; },
     cfg: cfg, sb: sb, EMAIL: EMAIL, PREORDER_DAYS: PREORDER_DAYS, CATS: CATS,
     esc: esc, money: money, moneyFull: moneyFull,
     loadProducts: loadProducts, byId: byId, isLive: function () { return live; }, products: function () { return products; },

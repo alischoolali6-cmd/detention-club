@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Item — Detention Club</title>
+<script src="config.js"></script>
+<script>document.documentElement.setAttribute("data-mode", (window.DC_CONFIG && DC_CONFIG.mode === "event") ? "event" : "store");</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body class="pdp-loading">
@@ -20,9 +22,11 @@
       <div class="pdp__price" id="pdpPrice"></div>
       <p id="pdpAvail" class="notice" style="margin:0"></p>
       <p id="pdpDesc" style="color:var(--color-ink-2);font-size:var(--text-md);max-width:52ch"></p>
-      <div class="pdp__qty pdp__main-add"><div class="qty"><button type="button" id="qMinus" aria-label="Fewer">−</button><span id="qVal">1</span><button type="button" id="qPlus" aria-label="More">+</button></div></div>
-      <div class="actions pdp__main-add"><button class="btn" id="addBtn">Add to cart</button><a class="btn btn--ghost" href="checkout.html">Checkout</a></div>
-      <p class="stock-note">Pay cash on delivery. Orders are usually delivered within 1 to 2 days.</p>
+      <div class="pdp__qty pdp__main-add" data-only="store"><div class="qty"><button type="button" id="qMinus" aria-label="Fewer">−</button><span id="qVal">1</span><button type="button" id="qPlus" aria-label="More">+</button></div></div>
+      <div class="actions pdp__main-add" data-only="store"><button class="btn" id="addBtn">Add to cart</button><a class="btn btn--ghost" href="checkout.html">Checkout</a></div>
+      <p class="stock-note" data-only="store">Pay cash on delivery. Orders are usually delivered within 1 to 2 days.</p>
+      <div class="notice" data-only="event" style="margin:0"><b>Find this at our stall.</b><br>Bahrain National Day at Quest School, 15 December 2026. Cash and Benefit accepted.</div>
+      <div class="actions" data-only="event"><a class="btn" href="index.html#event">Event details</a><a class="btn btn--ig" href="https://www.instagram.com/detention_club67/" target="_blank" rel="noopener">Follow us on Instagram</a></div>
     </div>
   </section>
 
@@ -37,7 +41,7 @@
   </section>
 </main>
 
-<div class="pdp__bar" id="pdpBar" hidden>
+<div class="pdp__bar" id="pdpBar" data-only="store" hidden>
   <div><div class="pdp__price" id="barPrice" style="font-size:var(--text-lg)"></div><div class="stock-note" id="barNote"></div></div>
   <button class="btn" id="barAdd">Add to cart</button>
 </div>
@@ -61,6 +65,7 @@
   function toast(m){ var t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function(){ t.hidden = true; }, 2200); }
 
   function avail(p){
+    if(DC.EVENT) return "Available at our stall";
     if(DC.soldOut(p)) return "Sold out";
     return p.stock > 0 ? "In stock" : DC.ABROAD;
   }
@@ -81,7 +86,7 @@
     var dis = DC.soldOut(p);
     [$("addBtn"), $("barAdd")].forEach(function(b){ b.disabled = dis; b.textContent = btnText(p); });
     $("barPrice").textContent = DC.money(p.price_fils); $("barNote").textContent = p.stock > 0 ? "In stock" : dis ? "Sold out" : "+" + DC.PREORDER_DAYS + " days";
-    $("pdp").hidden = false; $("pdpBar").hidden = false; document.body.classList.add("has-pdp-bar");
+    $("pdp").hidden = false; if(!DC.EVENT){ $("pdpBar").hidden = false; document.body.classList.add("has-pdp-bar"); }
 
     var rel = DC.suggest([p.id], 8, [p.category]);
     if(rel.length){
@@ -90,7 +95,7 @@
         var cc = DC.CATS[x.category] || { color: "var(--color-paper-3)" };
         var out = DC.soldOut(x);
         return '<article class="card"><div class="card__media" style="--cat-color:' + cc.color + '">' + (x.image ? '<img src="' + DC.esc(x.image) + '" alt="' + DC.esc(x.name) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover">' : '') + '</div>' +
-          '<div class="card__body"><h3 class="card__name"><a class="card__link" href="product.html?id=' + x.id + '#' + x.id + '">' + DC.esc(x.name) + '</a></h3><div class="card__foot"><span class="price">' + DC.money(x.price_fils) + '</span><button class="card__add" data-add="' + x.id + '"' + (out ? ' disabled' : '') + '>' + (out ? 'Sold out' : x.stock > 0 ? 'Add' : 'Pre-order') + '</button></div></div></article>';
+          '<div class="card__body"><h3 class="card__name"><a class="card__link" href="product.html?id=' + x.id + '#' + x.id + '">' + DC.esc(x.name) + '</a></h3><div class="card__foot"><span class="price">' + DC.money(x.price_fils) + '</span>' + (DC.EVENT ? '' : '<button class="card__add" data-add="' + x.id + '"' + (out ? ' disabled' : '') + '>' + (out ? 'Sold out' : x.stock > 0 ? 'Add' : 'Pre-order') + '</button>') + '</div></div></article>';
       }).join("");
     }
     document.body.classList.remove("pdp-loading");
