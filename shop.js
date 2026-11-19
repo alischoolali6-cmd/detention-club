@@ -49,12 +49,16 @@
   try { var pc = JSON.parse(sessionStorage.getItem("dc_products") || "null"); if (pc && pc.length) products = pc; } catch (e) {}
   function loadProducts() {
     if (loading) return loading;
-    if (!sb) { products = FALLBACK.slice(); live = false; loading = Promise.resolve(products); return loading; }
-    loading = sb.from("products").select("*").eq("active", true).order("sort").order("id").then(function (r) {
-      if (r.error || !r.data || !r.data.length) { if (!products.length) products = FALLBACK.slice(); live = false; }
-      else { products = r.data; live = true; try { sessionStorage.setItem("dc_products", JSON.stringify(products)); } catch (e) {} pruneCart(); }
+    // The event catalog lives in FALLBACK, not the database, so never wait on the network for it.
+    if (!sb || EVENT) { products = FALLBACK.slice(); live = false; loading = Promise.resolve(products); return loading; }
+    function useFallback() { if (!products.length) products = FALLBACK.slice(); live = false; return products; }
+    var query = sb.from("products").select("*").eq("active", true).order("sort").order("id").then(function (r) {
+      if (r.error || !r.data || !r.data.length) return useFallback();
+      products = r.data; live = true; try { sessionStorage.setItem("dc_products", JSON.stringify(products)); } catch (e) {} pruneCart();
       return products;
-    }, function () { if (!products.length) products = FALLBACK.slice(); live = false; return products; });
+    }, useFallback);
+    var timeout = new Promise(function (resolve) { setTimeout(function () { resolve(useFallback()); }, 5000); });
+    loading = Promise.race([query, timeout]);
     return loading;
   }
   function byId(id) { for (var i = 0; i < products.length; i++) if (products[i].id === Number(id)) return products[i]; return null; }
